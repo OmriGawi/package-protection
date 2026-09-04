@@ -65,8 +65,39 @@ const WEIGHTED_OUTCOMES: MockOutcome[] = [
   "CALL_FAILED",
 ];
 
+const MOCK_OUTCOMES: MockOutcome[] = ["INTACT", "OPENED", "INCONCLUSIVE", "CALL_FAILED"];
+
+let warnedAboutInvalidOutcome = false;
+
+/**
+ * A forced outcome from TAMPER_CHECK_OUTCOME, or null to draw at random.
+ *
+ * Random is right for exercising the app, but useless when you want to *show*
+ * someone a specific state — you can't demo an opened package by uploading
+ * photos and hoping for a 1-in-7 draw. Read per call so changing it doesn't
+ * mean rebuilding anything.
+ */
+export function forcedOutcome(): MockOutcome | null {
+  const configured = process.env.TAMPER_CHECK_OUTCOME?.trim().toUpperCase();
+  if (!configured || configured === "RANDOM") return null;
+
+  if ((MOCK_OUTCOMES as string[]).includes(configured)) {
+    return configured as MockOutcome;
+  }
+
+  // Silently falling back to random would look exactly like a typo'd value
+  // working, which is worse than the typo.
+  if (!warnedAboutInvalidOutcome) {
+    warnedAboutInvalidOutcome = true;
+    console.warn(
+      `Ignoring TAMPER_CHECK_OUTCOME="${process.env.TAMPER_CHECK_OUTCOME}" — expected one of ${MOCK_OUTCOMES.join(", ")}, or RANDOM. Falling back to random.`
+    );
+  }
+  return null;
+}
+
 export function pickWeightedOutcome(): MockOutcome {
-  return WEIGHTED_OUTCOMES[Math.floor(Math.random() * WEIGHTED_OUTCOMES.length)];
+  return forcedOutcome() ?? WEIGHTED_OUTCOMES[Math.floor(Math.random() * WEIGHTED_OUTCOMES.length)];
 }
 
 /**
@@ -75,6 +106,15 @@ export function pickWeightedOutcome(): MockOutcome {
  * not detecting anything — and just reproduces the shape of the interaction:
  * a slow call that usually says "intact", sometimes flags a package, and
  * sometimes fails outright.
+ *
+ * Because it doesn't compare anything, uploading the *same* photos twice
+ * proves nothing and can still come back "opened". Set TAMPER_CHECK_OUTCOME
+ * to pin the result when you need a specific state (see forcedOutcome).
+ *
+ * Note it is not a "are these two images identical?" check, and shouldn't
+ * become one: real pre-ship and post-receive photos are separate photographs
+ * taken days apart, so they never match byte for byte. Equality would flag
+ * every genuine package as opened.
  */
 export class MockTamperCheckClient implements TamperCheckClient {
   constructor(

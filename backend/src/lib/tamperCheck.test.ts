@@ -1,5 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { MockTamperCheckClient, TamperCheckCallError, type MockOutcome } from "./tamperCheck";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  MockTamperCheckClient,
+  TamperCheckCallError,
+  forcedOutcome,
+  pickWeightedOutcome,
+  type MockOutcome,
+} from "./tamperCheck";
 
 const input = {
   packageId: "pkg-1",
@@ -30,5 +36,52 @@ describe("MockTamperCheckClient", () => {
     const result = await clientReturning("INTACT").check(input);
 
     expect(result.raw).toMatchObject({ mock: true, comparedPreShip: 1, comparedPostReceive: 1 });
+  });
+
+  it("ignores the images — identical sets prove nothing about the verdict", async () => {
+    const sameImages = { ...input, preShip: input.preShip, postReceive: input.preShip };
+
+    // Deliberate: the mock detects nothing, so it must not be read as evidence
+    // that identical photos mean an untampered package.
+    const result = await clientReturning("OPENED").check(sameImages);
+
+    expect(result.verdict).toBe("OPENED");
+  });
+});
+
+describe("TAMPER_CHECK_OUTCOME", () => {
+  const original = process.env.TAMPER_CHECK_OUTCOME;
+  afterEach(() => {
+    process.env.TAMPER_CHECK_OUTCOME = original;
+    vi.restoreAllMocks();
+  });
+
+  it.each(["INTACT", "OPENED", "INCONCLUSIVE", "CALL_FAILED"] as const)("pins the outcome to %s", (outcome) => {
+    process.env.TAMPER_CHECK_OUTCOME = outcome;
+
+    expect(forcedOutcome()).toBe(outcome);
+    // Every draw, not just the first — this is what makes a demo repeatable.
+    expect(Array.from({ length: 20 }, pickWeightedOutcome).every((o) => o === outcome)).toBe(true);
+  });
+
+  it("is case-insensitive and tolerates stray whitespace", () => {
+    process.env.TAMPER_CHECK_OUTCOME = " opened ";
+    expect(forcedOutcome()).toBe("OPENED");
+  });
+
+  it.each(["RANDOM", "", undefined])("draws at random for %o", (value) => {
+    if (value === undefined) delete process.env.TAMPER_CHECK_OUTCOME;
+    else process.env.TAMPER_CHECK_OUTCOME = value;
+
+    expect(forcedOutcome()).toBeNull();
+  });
+
+  it("warns rather than silently ignoring a misspelled value", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    process.env.TAMPER_CHECK_OUTCOME = "INTECT";
+
+    // A typo that quietly behaves like RANDOM looks exactly like it working.
+    expect(forcedOutcome()).toBeNull();
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("INTECT"));
   });
 });
