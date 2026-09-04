@@ -36,7 +36,8 @@ are deliberately not repeated here.
   `git add -A`/`.` without reviewing `git status` first — this repo has
   caught a stray install landing at the wrong path before.
 - Scopes follow the repo layout: `backend`, `frontend`, `db`, `skills`,
-  `docs`, `ci`. Pass these to `caveman-commit`; it can't guess them.
+  `hooks`, `docs`, `ci`. Pass these to `caveman-commit`; it can't guess
+  them.
 - Body caps at ~8 lines. One paragraph per non-obvious decision, three
   max. Code-review fixes are not a commit-body section — the diff and
   the PR carry them.
