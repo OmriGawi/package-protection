@@ -61,7 +61,7 @@ problem in practice.)
 |---|---|
 | id | |
 | delivery_id | FK |
-| label | **System-assigned**, sequential per delivery (`1`, `2`, `3`...) — auto-incremented as each package is saved during creation, not typed by the employee. The UI tells them the number to write on the box (e.g. "write 3 on this one"), so there's no free-text entry and no typo/mismatch risk. Unique **within the delivery**, not globally. No barcode/label printing for now — this is still a handwritten number, just app-assigned rather than app-recorded. |
+| label | **System-assigned**, sequential per delivery (`1`, `2`, `3`...) — auto-incremented as each package is saved during creation, not typed by the employee. The UI tells them the number to write on the box (e.g. "write 3 on this one"), so there's no free-text entry and no typo/mismatch risk. Unique **within the delivery**, not globally. No barcode/label printing for now — this is still a handwritten number, just app-assigned rather than app-recorded. **Numbers are never reused or renumbered** (settled 2026-09-04 while implementing): the next label is `max(existing) + 1`, so deleting package 2 of 1,2,3 leaves 1,3 and the next box is 4. Gaps are harmless; reuse is not, because the number is already written in marker on a carton, and renumbering would silently change what an existing box's number means. The mockup got this wrong — it used `count + 1`, which hands out a duplicate "3" after that delete. |
 | workflow_status | `PRE_SHIP_UPLOADED` → `SHIPPED` → `CHECKING` → `RECEIVED` — `CHECKING` is the transient state while post-receive photos are submitted and the tamper-detection API call is in flight (UI shows "מבצע בדיקה…"); `verdict` is only meaningful once `RECEIVED`. `CHECKING` can also land on `CHECK_FAILED` instead of `RECEIVED` — the API call itself errored (timeout/service error), not a verdict — from which the only action is retrying the same call; the post-receive photos already collected are not lost or re-asked-for. |
 | verdict | `INTACT` \| `OPENED` \| `INCONCLUSIVE` — starts as whatever the API/TamperCheck produced |
 | verdict_source | `API` \| `MANUAL` |
@@ -83,7 +83,7 @@ see §4.4.
 | id | |
 | package_id | FK |
 | phase | `PRE_SHIP` \| `POST_RECEIVE` |
-| storage_path | Path on NAS/network storage |
+| storage_path | Opaque handle returned by the storage client (§7) — never exposed over the API; clients fetch an image by its `id` |
 | uploaded_by | |
 | uploaded_at | |
 | sequence | ordering within the set |
@@ -92,6 +92,21 @@ Minimum 4 images per phase per package. Client-side validation on upload:
 image count, file type, file size. Deeper quality checks (blur, lighting,
 angle coverage) are deferred until we know what the tamper-detection API
 actually requires — see open questions.
+
+**Accepted formats (settled 2026-09-04 while implementing): JPEG, PNG, WebP,
+GIF**, and the format is determined by sniffing the file's magic bytes, not by
+the `Content-Type` the browser sends (which the client controls). Two
+deliberate exclusions:
+
+- **SVG** — it can carry script, and serving it back from our own origin as
+  `image/svg+xml` would be an XSS vector. Package photos are never vector art.
+- **HEIC/HEIF** — see §9. It passes a naive "is it an image" check but Chrome
+  and Firefox can't render it, so it would store happily and come back as
+  unviewable evidence, which defeats the point of a tool built around visual
+  comparison.
+
+Rejecting rather than silently storing these is the point: a photo that can't
+be displayed later is worse than one that was never accepted.
 
 ### TamperCheck
 | Field | Notes |
@@ -346,6 +361,14 @@ should treat this behind a small storage-client abstraction so the actual
 transport (whatever that service's API turns out to be) is swappable. Contract
 details are TBD — see open questions.
 
+**Implemented 2026-09-04** as a `StorageClient` interface (`save` / `read` /
+`delete`) with a local-disk implementation for development. Two consequences
+worth keeping when the real service arrives: images are served through the
+client by image `id` (`GET /api/images/:id`) rather than from a static
+directory, so swapping the backend changes no URL the frontend uses; and
+`storage_path` never leaves the API, so nothing outside the client depends on
+how the store lays files out.
+
 ## 8. Tech Stack
 
 - Frontend: React
@@ -353,6 +376,17 @@ details are TBD — see open questions.
 - Database: PostgreSQL
 - Containerized, deployed to VMware Tanzu via existing company CI/CD.
 - Dev path: local machine now → company laptop → company internal network.
+
+Filled in 2026-09-04 when implementation started, all in **TypeScript**:
+
+| Choice | Notes |
+|---|---|
+| Prisma (ORM) | Pinned to 6.x — 7.x moves datasource config out of `schema.prisma` into a separate config format with driver adapters, more moving parts than this needs. |
+| Express 5 + multer 2 | multer 1.x is deprecated. |
+| Vite + React Router | Real URLs (`/deliveries/:id`) rather than the mockup's view-switching, because §4.4's dashboard has to deep-link into a specific package. |
+| Vitest (both sides) + supertest + React Testing Library | |
+| Postgres 16 in Docker Compose locally | Backend runs natively for now; containerizing it is a later step. |
+| `timestamptz` for datetime columns | A bare `timestamp` stores a wall-clock with no zone attached, so anything reading the DB directly (psql, a BI tool) can't tell it's UTC. Storage stays UTC; conversion to Israel time happens at display, via locale formatting rather than a hardcoded +3 — Israel is UTC+3 in summer but UTC+2 in winter. |
 
 **UI prototyping note**: `ui/index.html` is a standalone Tailwind-CDN + vanilla-JS
 mockup — not the production frontend. It exists to iterate on layout/flow/RTL
@@ -379,6 +413,17 @@ screen's design is settled here.
 - Retry/idempotency semantics if a call errors out? (UI now mocks a generic
   "call failed, retry" state — §4.2 — but the real retry/idempotency contract
   is still unknown)
+- **Does it accept HEIC/HEIF?** Surfaced 2026-09-04 while implementing uploads,
+  and it's the one open question likely to bite in real use rather than in
+  theory. §4.2 says photos are typically taken on a personal phone, and iPhones
+  shoot HEIC by default — but Chrome and Firefox can't display it, so we
+  currently reject it (§3) rather than store evidence nobody can look at. That
+  leaves a real gap for anyone photographing on an iPhone with default
+  settings. Three possible answers, and which one we pick depends on this API:
+  convert HEIC → JPEG server-side on upload; require employees to switch their
+  phone camera to "Most Compatible"; or accept HEIC for the API's benefit and
+  additionally store a converted copy for viewing. Worth asking early, since
+  conversion means a new backend dependency.
 
 ### ERP view (to raise with whoever owns it)
 - Does the ERP view actually expose the shipment → PO linkage described in
@@ -551,3 +596,24 @@ changelog entries.
   open-questions in §9 into a stakeholder-facing summary (business/product
   vs. the tamper-detection API's developer) for the review meeting — content
   unchanged from §9, just organized by audience.
+- 2026-09-04: **Started building the real application**, replacing the mockup
+  screen by screen. Filled in the concrete stack (§8) and set the working
+  method: one vertical slice at a time, each going all the way through Docker
+  Postgres → Prisma → Express → React rather than finishing a whole layer at
+  a time, so the pieces are proven to fit early.
+  **Slice 1 — Create Delivery**: direction, ERP reference validation (mocked
+  locally, §5), and the delivery row. Learned that server-side re-validation
+  of the reference matters: the create endpoint originally trusted that the
+  client had called validate-reference first, which a direct request could
+  simply skip.
+  **Slice 2 — Packages + pre-ship photos**: the `Package`/`PackageImage`
+  models (§3), the storage client (§7), and the create flow rebuilt as the
+  mockup actually specifies it — separate My Deliveries and Create Delivery
+  screens, since Slice 1 had collapsed them onto one page. A delivery and all
+  of its packages are created in a single request, keeping §3's rule that
+  nothing is persisted before Submit. Two decisions came out of building it
+  rather than designing it: package numbers now skip gaps instead of being
+  reused (§3 — the mockup's `count + 1` hands out duplicates after a delete,
+  which matters because the number is written on a physical box), and photo
+  formats are restricted and sniffed from the file's bytes (§3), which is
+  what surfaced the HEIC problem now recorded in §9.
