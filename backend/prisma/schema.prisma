@@ -16,6 +16,33 @@ enum DeliveryStatus {
   SUBMITTED
 }
 
+// Full lifecycle per DESIGN.md §3. Only SHIPPED is reachable in this slice —
+// CHECKING / RECEIVED / CHECK_FAILED arrive with receiving (Slice 3), but are
+// defined now so that doesn't need a second enum migration.
+enum WorkflowStatus {
+  PRE_SHIP_UPLOADED
+  SHIPPED
+  CHECKING
+  RECEIVED
+  CHECK_FAILED
+}
+
+enum Verdict {
+  INTACT
+  OPENED
+  INCONCLUSIVE
+}
+
+enum VerdictSource {
+  API
+  MANUAL
+}
+
+enum Phase {
+  PRE_SHIP
+  POST_RECEIVE
+}
+
 model Delivery {
   id              String         @id @default(uuid())
   internalNumber  Int            @unique @default(autoincrement())
@@ -23,5 +50,41 @@ model Delivery {
   referenceNumber String
   status          DeliveryStatus @default(SUBMITTED)
   createdBy       String
-  createdAt       DateTime       @default(now())
+  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
+
+  packages Package[]
+}
+
+model Package {
+  id             String         @id @default(uuid())
+  deliveryId     String
+  delivery       Delivery       @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  // Handwritten on the physical box, so unique within its delivery only —
+  // not globally (DESIGN.md §3).
+  label          Int
+  workflowStatus WorkflowStatus @default(SHIPPED)
+
+  verdict       Verdict?
+  verdictSource VerdictSource?
+
+  verdictOverriddenBy String?
+  overriddenAt        DateTime? @db.Timestamptz(3)
+  overrideNote        String?
+
+  images PackageImage[]
+
+  @@unique([deliveryId, label])
+}
+
+model PackageImage {
+  id          String   @id @default(uuid())
+  packageId   String
+  package     Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  phase       Phase
+  // Opaque to us — whatever the StorageClient handed back. Local disk today,
+  // an internal storage service in production (DESIGN.md §7).
+  storagePath String
+  uploadedBy  String
+  uploadedAt  DateTime @default(now()) @db.Timestamptz(3)
+  sequence    Int
 }
