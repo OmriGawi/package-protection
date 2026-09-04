@@ -1,20 +1,115 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { getDelivery, imageUrl, type DeliveryDetail } from "../api/client";
+import {
+  getDelivery,
+  imageUrl,
+  retryTamperCheck,
+  type DeliveryDetail,
+  type Package,
+} from "../api/client";
+import { ReceivePhotosPanel } from "../components/ReceivePhotosPanel";
 import { DIRECTION_TEXT, WORKFLOW_TEXT, formatDate, verdictInfo } from "../lib/display";
+
+type Expansion = { label: number; mode: "view" | "upload" } | null;
+
+const POLL_INTERVAL_MS = 1000;
+
+function PhotoGrid({ images }: { images: Package["images"] }) {
+  return (
+    <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(6,1fr)", maxWidth: 520 }}>
+      {images.map((image) => (
+        <a key={image.id} className="thumb" href={imageUrl(image.id)} target="_blank" rel="noreferrer">
+          <img src={imageUrl(image.id)} alt={`תמונה ${image.sequence}`} />
+        </a>
+      ))}
+    </div>
+  );
+}
 
 export function DeliveryPackagesPage() {
   const { id } = useParams<{ id: string }>();
   const [delivery, setDelivery] = useState<DeliveryDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [expandedLabel, setExpandedLabel] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState<Expansion>(null);
+
+  const [uploadDirty, setUploadDirty] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!id) return null;
+    const next = await getDelivery(id);
+    setDelivery(next);
+    setError(null);
+    return next;
+  }, [id]);
 
   useEffect(() => {
-    if (!id) return;
-    getDelivery(id)
-      .then(setDelivery)
-      .catch(() => setError("טעינת המשלוח נכשלה"));
-  }, [id]);
+    load().catch(() => setError("טעינת המשלוח נכשלה"));
+  }, [load]);
+
+  const checkingLabels = delivery?.packages.filter((p) => p.workflowStatus === "CHECKING") ?? [];
+  const isChecking = checkingLabels.length > 0;
+
+  // The check runs server-side and its result arrives whenever it arrives, so
+  // the page polls only while something is actually in flight.
+  const previouslyChecking = useRef<number[]>([]);
+  const uploadDirtyRef = useRef(uploadDirty);
+  uploadDirtyRef.current = uploadDirty;
+
+  useEffect(() => {
+    if (!isChecking) return;
+    const timer = setInterval(() => {
+      load()
+        .then((next) => {
+          if (!next) return;
+          // A package that just resolved opens on its photos, so the verdict
+          // and the evidence behind it land together (DESIGN.md §4.2).
+          const stillChecking = next.packages.filter((p) => p.workflowStatus === "CHECKING").map((p) => p.label);
+          const justResolved = previouslyChecking.current.find((label) => !stillChecking.includes(label));
+          // Never steal an upload panel that has photos picked in it — a
+          // background event must not bin work the employee is mid-way through.
+          if (justResolved !== undefined && !uploadDirtyRef.current) {
+            setExpanded({ label: justResolved, mode: "view" });
+          }
+          previouslyChecking.current = stillChecking;
+        })
+        .catch(() => {
+          /* a failed poll is not fatal — the next tick tries again */
+        });
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [isChecking, load]);
+
+  useEffect(() => {
+    previouslyChecking.current = checkingLabels.map((p) => p.label);
+    // Only tracks which labels were mid-check at the time of the last render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [delivery]);
+
+  function toggleView(label: number) {
+    // Clicking away from an upload panel with photos already picked would
+    // discard them, so ask first — same guard as the pre-ship packages card.
+    if (expanded?.mode === "upload" && uploadDirty) {
+      if (!window.confirm("התמונות שטרם נשלחו יימחקו. להמשיך?")) return;
+    }
+    setExpanded((current) =>
+      current?.label === label && current.mode === "view" ? null : { label, mode: "view" }
+    );
+  }
+
+  async function retry(pkg: Package) {
+    if (retrying) return;
+    setRetrying(pkg.id);
+    setError(null);
+    try {
+      await retryTamperCheck(pkg.id);
+      await load();
+    } catch {
+      setError("הפעלת הבדיקה מחדש נכשלה");
+    } finally {
+      setRetrying(null);
+    }
+  }
 
   return (
     <>
@@ -52,45 +147,122 @@ export function DeliveryPackagesPage() {
                       {heading}
                     </th>
                   ))}
+                  <th className="px-6 py-3.5" />
                 </tr>
               </thead>
               <tbody>
                 {delivery.packages.map((pkg) => {
                   const badge = verdictInfo(pkg);
-                  const isExpanded = expandedLabel === pkg.label;
-                  const preShipImages = pkg.images.filter((image) => image.phase === "PRE_SHIP");
+                  const isExpanded = expanded?.label === pkg.label;
+                  const preShip = pkg.images.filter((image) => image.phase === "PRE_SHIP");
+                  const postReceive = pkg.images.filter((image) => image.phase === "POST_RECEIVE");
 
                   return [
                     <tr
                       key={pkg.id}
                       className="row-hover cursor-pointer"
                       style={{ borderBottom: isExpanded ? "none" : "1px solid var(--border)" }}
-                      onClick={() => setExpandedLabel(isExpanded ? null : pkg.label)}
+                      onClick={() => toggleView(pkg.label)}
                     >
                       <td className="px-6 py-4 font-semibold">חבילה {pkg.label}</td>
                       <td className="px-6 py-4" style={{ color: "var(--text-secondary)" }}>
                         {WORKFLOW_TEXT[pkg.workflowStatus]}
                       </td>
                       <td className="px-6 py-4">
-                        <span
-                          className="inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-semibold"
-                          style={{ color: badge.color, background: badge.bg }}
-                        >
-                          {badge.text}
-                        </span>
+                        {pkg.workflowStatus === "CHECKING" ? (
+                          <span
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11.5px] font-semibold"
+                            style={{ color: "var(--blue)", background: "var(--blue-soft)" }}
+                          >
+                            <span
+                              className="inline-block w-2.5 h-2.5 rounded-full"
+                              style={{ border: "2px solid #ffffff", borderTopColor: "var(--blue)", animation: "spin .7s linear infinite" }}
+                            />
+                            מבצע בדיקה…
+                          </span>
+                        ) : (
+                          <span
+                            className="inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-semibold"
+                            style={{ color: badge.color, background: badge.bg }}
+                          >
+                            {badge.text}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-left">
+                        {pkg.workflowStatus === "SHIPPED" && (
+                          <button
+                            type="button"
+                            className="px-3.5 py-1.5 rounded-lg text-[12.5px] font-semibold"
+                            style={{ border: "1px solid #00000018", color: "var(--text)" }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setExpanded({ label: pkg.label, mode: "upload" });
+                            }}
+                          >
+                            העלאת תמונות קבלה
+                          </button>
+                        )}
+                        {pkg.workflowStatus === "CHECK_FAILED" && (
+                          <button
+                            type="button"
+                            className="px-3.5 py-1.5 rounded-lg text-[12.5px] font-semibold disabled:opacity-35"
+                            style={{ border: "1px solid var(--purple)", color: "var(--purple)" }}
+                            disabled={retrying === pkg.id}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              retry(pkg);
+                            }}
+                          >
+                            ניסיון חוזר
+                          </button>
+                        )}
                       </td>
                     </tr>,
+
                     isExpanded && (
-                      <tr key={`${pkg.id}-photos`} style={{ borderBottom: "1px solid var(--border)" }}>
-                        <td colSpan={3} className="px-6 pb-5">
-                          <div className="text-[12.5px] font-semibold mb-2.5">תמונות שליחה</div>
-                          <div className="grid gap-2.5" style={{ gridTemplateColumns: "repeat(6,1fr)", maxWidth: 520 }}>
-                            {preShipImages.map((image) => (
-                              <a key={image.id} className="thumb" href={imageUrl(image.id)} target="_blank" rel="noreferrer">
-                                <img src={imageUrl(image.id)} alt={`תמונה ${image.sequence} של חבילה ${pkg.label}`} />
-                              </a>
-                            ))}
-                          </div>
+                      <tr
+                        key={`${pkg.id}-panel`}
+                        style={{ borderBottom: "1px solid var(--border)", background: "#fafbfc" }}
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <td colSpan={4} className="px-6 py-5">
+                          {expanded?.mode === "upload" ? (
+                            <ReceivePhotosPanel
+                              packageId={pkg.id}
+                              label={pkg.label}
+                              onDirtyChange={setUploadDirty}
+                              onSubmitted={() => {
+                                setExpanded(null);
+                                load().catch(() => setError("טעינת המשלוח נכשלה"));
+                              }}
+                              onCancel={() => setExpanded(null)}
+                            />
+                          ) : (
+                            <>
+                              <div className="text-[12px] font-semibold mb-2" style={{ color: "var(--text-secondary)" }}>
+                                תמונות לפני משלוח
+                              </div>
+                              {preShip.length > 0 ? (
+                                <PhotoGrid images={preShip} />
+                              ) : (
+                                <div className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                                  אין תמונות
+                                </div>
+                              )}
+
+                              <div className="text-[12px] font-semibold mt-5 mb-2" style={{ color: "var(--text-secondary)" }}>
+                                תמונות בקבלה
+                              </div>
+                              {postReceive.length > 0 ? (
+                                <PhotoGrid images={postReceive} />
+                              ) : (
+                                <div className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
+                                  טרם הועלו תמונות קבלה
+                                </div>
+                              )}
+                            </>
+                          )}
                         </td>
                       </tr>
                     ),

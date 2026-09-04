@@ -98,3 +98,22 @@ export function getDelivery(id: string) {
 export function imageUrl(imageId: string) {
   return `${API_URL}/api/images/${imageId}`;
 }
+
+/**
+ * Uploads the receiving photos and starts the tamper check. Returns with the
+ * package in CHECKING — the verdict arrives later, via polling (DESIGN.md §4.2).
+ */
+export function submitPostReceivePhotos(packageId: string, photos: File[]) {
+  const form = new FormData();
+  for (const photo of photos) form.append("photos", photo, photo.name);
+
+  return request<Package>(`/api/packages/${packageId}/post-receive-photos`, {
+    method: "POST",
+    body: form,
+  });
+}
+
+/** Re-runs a failed check against the already-uploaded photos — no re-upload. */
+export function retryTamperCheck(packageId: string) {
+  return request<Package>(`/api/packages/${packageId}/tamper-check`, { method: "POST" });
+}

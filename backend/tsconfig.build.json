@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.json",
+  // Tests are typechecked by the base config, but never emitted: compiling
+  // them into dist/ ships test code, and the resulting .test.js files get
+  // picked up by the test runner as a duplicate, broken suite.
+  "exclude": ["**/*.test.ts"]
+}

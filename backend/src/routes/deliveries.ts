@@ -1,37 +1,19 @@
 import { Router, type Request, type Response } from "express";
-import multer from "multer";
 import { randomUUID } from "crypto";
 import { prisma } from "../lib/prisma";
 import { storage } from "../lib/storage";
-import { ALLOWED_IMAGE_TYPES_LABEL, detectImageType, extensionForImageType } from "../lib/imageTypes";
+import {
+  IMAGE_SELECT,
+  MIN_PHOTOS_PER_PACKAGE,
+  PHOTO_TYPE_ERROR,
+  detectPhotoTypes,
+  savePhotos,
+  upload,
+} from "../lib/photoUpload";
+import { CURRENT_USER } from "../lib/currentUser";
 import { validateReference, type Direction } from "../services/erpMock";
 
 export const deliveriesRouter = Router();
-
-const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
-const MAX_PHOTOS_PER_DELIVERY = 200;
-
-// Bounded because memoryStorage buffers every part in RAM before any of our
-// own validation runs — without limits one oversized POST can take the process
-// down. A real size/resolution floor is still open (DESIGN.md §9); these are
-// blast-radius caps, not quality rules.
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_PHOTO_BYTES, files: MAX_PHOTOS_PER_DELIVERY },
-});
-
-// Until there's real auth (Slice 6 / Keycloak in production, DESIGN.md §6).
-const CURRENT_USER = "local-dev-user";
-
-const MIN_PHOTOS_PER_PACKAGE = 4;
-
-// storagePath is deliberately absent: it's the storage backend's internal
-// layout, which the StorageClient exists to keep private. Clients address an
-// image by id via /api/images/:id and never need to know where it lives.
-const IMAGE_SELECT = {
-  select: { id: true, phase: true, sequence: true, uploadedAt: true },
-  orderBy: { sequence: "asc" },
-} as const;
 
 interface PackageInput {
   label: number;
@@ -101,12 +83,9 @@ deliveriesRouter.post("/", upload.any(), async (req, res) => {
   }
 
   const files = (req.files as Express.Multer.File[]) ?? [];
-  // Sniffed from the bytes, never taken from the part's Content-Type header.
-  const detectedTypes = new Map(files.map((file) => [file, detectImageType(file.buffer)]));
-  if (files.some((file) => detectedTypes.get(file) == null)) {
-    return res.status(400).json({
-      error: `every photo must be an image file (${ALLOWED_IMAGE_TYPES_LABEL})`,
-    });
+  const detectedTypes = detectPhotoTypes(files);
+  if (!detectedTypes) {
+    return res.status(400).json({ error: PHOTO_TYPE_ERROR });
   }
 
   const filesByLabel = new Map<number, Express.Multer.File[]>();
@@ -133,15 +112,7 @@ deliveriesRouter.post("/", upload.any(), async (req, res) => {
   try {
     for (const [label, packageFiles] of filesByLabel) {
       const packageId = randomUUID();
-      const storagePaths = await Promise.all(
-        packageFiles.map((file) =>
-          storage.save(
-            file.buffer,
-            extensionForImageType(detectedTypes.get(file)!),
-            `${deliveryId}/${packageId}`
-          )
-        )
-      );
+      const storagePaths = await savePhotos(packageFiles, detectedTypes, `${deliveryId}/${packageId}`);
       written.push({ packageId, label, storagePaths });
     }
 

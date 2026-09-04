@@ -30,9 +30,14 @@ risky.
    as part of this step — don't skip tests because the harness isn't
    there yet.
 
-4. **Run tests.** Actually execute the suite (`npm test` in the relevant
-   package) and confirm it's green. Don't assume a test passes because it
-   looks right.
+4. **Run tests _and_ typecheck.** Execute the suite (`npm test`) *and*
+   `npm run typecheck` in each package you touched, and confirm both are
+   green. Don't assume a test passes because it looks right.
+
+   Both, because they catch different things: Vitest strips types without
+   checking them, so `npm test` can be fully green while `npm run build` is
+   broken — that is exactly how a type error once sat undetected across a
+   whole slice here.
 
 5. **Code review.** Run the `code-review` skill on the diff before
    considering the work finished or offering to merge. Fix what it finds,
