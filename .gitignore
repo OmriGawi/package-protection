@@ -10,3 +10,10 @@ backend/storage/
 .vscode/
 .idea/
 .claude/settings.local.json
+
+# Skills installed by `npx skills add` (see skills-lock.json to restore).
+# Own skills stay tracked.
+.agents/
+.claude/skills/*
+!.claude/skills/dev-workflow
+!.claude/skills/git-conventions
