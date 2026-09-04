@@ -56,53 +56,111 @@ export function CreateDelivery({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="max-w-xl bg-white rounded-xl shadow p-6 space-y-5">
-      <h2 className="text-lg font-bold">משלוח חדש</h2>
+    <div className="card" style={{ padding: "26px 28px", height: "fit-content" }}>
+      <div className="text-[13.5px] font-bold mb-5">פרטי המשלוח</div>
 
-      <div className="flex gap-2">
+      <div className="inline-flex rounded-lg overflow-hidden mb-6" style={{ border: "1px solid #00000018" }}>
         <button
-          className={`px-4 py-2 rounded-lg border ${direction === "EXPORT" ? "bg-[var(--navy,#004370)] text-white border-transparent" : "border-gray-300"}`}
+          type="button"
           onClick={() => setDirection("EXPORT")}
+          className="px-6 py-2.5 text-sm font-semibold transition"
+          style={
+            direction === "EXPORT"
+              ? { background: "var(--blue)", color: "#fff" }
+              : { background: "#fff", color: "var(--text-secondary)" }
+          }
         >
-          יצוא
+          ייצוא
         </button>
         <button
-          className={`px-4 py-2 rounded-lg border ${direction === "IMPORT" ? "bg-[var(--navy,#004370)] text-white border-transparent" : "border-gray-300"}`}
+          type="button"
           onClick={() => setDirection("IMPORT")}
+          className="px-6 py-2.5 text-sm font-semibold transition"
+          style={
+            direction === "IMPORT"
+              ? { background: "var(--blue)", color: "#fff" }
+              : { background: "#fff", color: "var(--text-secondary)" }
+          }
         >
           יבוא
         </button>
       </div>
 
-      <div>
+      <label htmlFor="reference-number" className="block text-[12.5px] font-semibold mb-2.5">
+        {direction === "EXPORT" ? "מספר משלוח" : "מספר הזמנה"}
+      </label>
+      <div style={{ position: "relative" }}>
         <input
-          className="w-full border border-gray-300 rounded-lg px-3 py-2"
-          placeholder={direction === "EXPORT" ? "מספר משלוח (SHP-...)" : "מספר הזמנה (PO-...)"}
+          id="reference-number"
+          className="field"
+          style={{ paddingLeft: 34 }}
+          dir="ltr"
+          placeholder={direction === "EXPORT" ? "SHP-88291" : "PO-88291"}
           value={referenceNumber}
           onChange={(e) => setReferenceNumber(e.target.value)}
           autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck={false}
           data-lpignore="true"
+          data-1p-ignore="true"
+          data-bwignore="true"
+          data-form-type="other"
         />
-        <div className="text-sm mt-1">
-          {refStatus === "checking" && <span className="text-gray-500">בודק מול ה-ERP…</span>}
-          {refStatus === "valid" && <span className="text-green-600">אומת מול ה-ERP</span>}
-          {refStatus === "invalid" && <span className="text-red-600">לא נמצא ב-ERP — בדקו את המספר</span>}
-        </div>
-        {linkedPoNumber && (
-          <div className="text-sm text-gray-600 mt-1">מספר הזמנה מקושר: {linkedPoNumber}</div>
+        {refStatus === "checking" && (
+          <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)" }}>
+            <span
+              className="inline-block w-3.5 h-3.5 rounded-full"
+              style={{ border: "2px solid var(--blue-soft)", borderTopColor: "var(--blue)", animation: "spin .7s linear infinite" }}
+            />
+          </span>
+        )}
+        {refStatus === "valid" && (
+          <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "var(--green)" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 6L9 17l-5-5" />
+            </svg>
+          </span>
+        )}
+        {refStatus === "invalid" && (
+          <span style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "var(--red)" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </span>
         )}
       </div>
+      <p className="mt-2 text-[12px]" style={{ minHeight: 16, color: refStatus === "valid" ? "var(--green)" : refStatus === "invalid" ? "var(--red)" : "var(--text-secondary)" }}>
+        {refStatus === "checking" && "בודק מול ה-ERP…"}
+        {refStatus === "valid" && "אומת מול ה-ERP"}
+        {refStatus === "invalid" && "לא נמצא ב-ERP — בדקו את המספר"}
+      </p>
 
-      <div>
-        <button
-          className="px-5 py-2 rounded-full bg-[var(--navy,#004370)] text-white disabled:opacity-40"
-          disabled={refStatus !== "valid" || submitting}
-          onClick={handleSubmit}
+      {linkedPoNumber && (
+        <div
+          className="flex items-center gap-1.5"
+          style={{ marginTop: 4, paddingTop: 14, borderTop: "1px solid var(--border)", fontSize: 12.5, color: "var(--text-secondary)" }}
         >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 17H7A5 5 0 017 7h2M15 7h2a5 5 0 010 10h-2M8 12h8" />
+          </svg>
+          מספר הזמנה משויך ב-ERP:
+          <span className="font-semibold" style={{ color: "var(--text)" }} dir="ltr">
+            {linkedPoNumber}
+          </span>
+        </div>
+      )}
+
+      <div className="flex justify-end mt-6">
+        <button className="btn-primary" disabled={refStatus !== "valid" || submitting} onClick={handleSubmit}>
           {submitting ? "שולח…" : "שליחה"}
         </button>
-        {submitError && <div className="text-sm text-red-600 mt-2">{submitError}</div>}
       </div>
+      {submitError && (
+        <p className="mt-2 text-[12px]" style={{ color: "var(--red)" }}>
+          {submitError}
+        </p>
+      )}
     </div>
   );
 }

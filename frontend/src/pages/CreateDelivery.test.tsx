@@ -10,11 +10,11 @@ describe("CreateDelivery", () => {
     const user = userEvent.setup();
     render(<CreateDelivery onCreated={() => {}} />);
 
-    await user.type(screen.getByPlaceholderText(/מספר משלוח/), "SHP-84213");
+    await user.type(screen.getByPlaceholderText("SHP-88291"), "SHP-84213");
 
     await waitFor(() => expect(screen.getByText("אומת מול ה-ERP")).toBeInTheDocument(), { timeout: 2000 });
     expect(screen.getByRole("button", { name: "שליחה" })).toBeEnabled();
-    expect(screen.getByText(/PO-84213/)).toBeInTheDocument();
+    expect(screen.getByText("PO-84213")).toBeInTheDocument();
   });
 
   it("shows the invalid state and keeps submit disabled for a bad reference", async () => {
@@ -22,7 +22,7 @@ describe("CreateDelivery", () => {
     const user = userEvent.setup();
     render(<CreateDelivery onCreated={() => {}} />);
 
-    await user.type(screen.getByPlaceholderText(/מספר משלוח/), "XYZ");
+    await user.type(screen.getByPlaceholderText("SHP-88291"), "XYZ");
 
     await waitFor(
       () => expect(screen.getByText("לא נמצא ב-ERP — בדקו את המספר")).toBeInTheDocument(),
@@ -46,7 +46,7 @@ describe("CreateDelivery", () => {
     const user = userEvent.setup();
     render(<CreateDelivery onCreated={onCreated} />);
 
-    await user.type(screen.getByPlaceholderText(/מספר משלוח/), "SHP-84213");
+    await user.type(screen.getByPlaceholderText("SHP-88291"), "SHP-84213");
     await waitFor(() => expect(screen.getByRole("button", { name: "שליחה" })).toBeEnabled(), {
       timeout: 2000,
     });
@@ -64,7 +64,7 @@ describe("CreateDelivery", () => {
     const user = userEvent.setup();
     render(<CreateDelivery onCreated={onCreated} />);
 
-    await user.type(screen.getByPlaceholderText(/מספר משלוח/), "SHP-84213");
+    await user.type(screen.getByPlaceholderText("SHP-88291"), "SHP-84213");
     await waitFor(() => expect(screen.getByRole("button", { name: "שליחה" })).toBeEnabled(), {
       timeout: 2000,
     });
@@ -88,7 +88,7 @@ describe("CreateDelivery", () => {
 
     const user = userEvent.setup({ delay: null });
     render(<CreateDelivery onCreated={() => {}} />);
-    const input = screen.getByPlaceholderText(/מספר משלוח/);
+    const input = screen.getByPlaceholderText("SHP-88291");
 
     await user.type(input, "SHP-11111");
     await waitFor(() => expect(screen.getByText("בודק מול ה-ERP…")).toBeInTheDocument(), {

@@ -28,6 +28,6 @@ describe("DeliveriesList", () => {
     render(<DeliveriesList refreshKey={0} />);
 
     await waitFor(() => expect(screen.getByText("טעינת המשלוחים נכשלה")).toBeInTheDocument());
-    expect(screen.queryByText("אין עדיין משלוחים.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/אין עדיין משלוחים/)).not.toBeInTheDocument();
   });
 });
