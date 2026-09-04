@@ -1,8 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "module": "commonjs",
-    "moduleResolution": "node",
+    // "nodenext" rather than the deprecated "node" (renamed "node10" in TS 5.x,
+    // and slated for removal): it resolves the way Node actually does. The
+    // package is "type": "commonjs", so this still emits CommonJS.
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
     "lib": ["ES2022"],
     "outDir": "dist",
     "rootDir": "src",
@@ -12,5 +15,7 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
+  // Everything under src, tests included, so the editor and `npm run
+  // typecheck` cover them. The build narrows this — see tsconfig.build.json.
   "include": ["src"]
 }

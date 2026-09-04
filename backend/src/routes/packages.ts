@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { prisma } from "../lib/prisma";
 import {
   IMAGE_SELECT,
@@ -26,7 +26,10 @@ function packageWithImages(id: string) {
  * tamper-detection call is started but not awaited — this returns 202 with the
  * package in CHECKING and the client polls for the outcome.
  */
-packagesRouter.post("/:id/post-receive-photos", upload.any(), async (req, res) => {
+// Params are typed explicitly because Express 5 widens req.params values to
+// `string | string[]` (a route can repeat a param), which a route with
+// middleware in front of it doesn't narrow from the path on its own.
+packagesRouter.post("/:id/post-receive-photos", upload.any(), async (req: Request<{ id: string }>, res) => {
   const pkg = await prisma.package.findUnique({ where: { id: req.params.id } });
   if (!pkg) return res.status(404).json({ error: "package not found" });
 
