@@ -9,7 +9,12 @@ export function CreateDelivery({ onCreated }: { onCreated: () => void }) {
   const [refStatus, setRefStatus] = useState<RefStatus>("idle");
   const [linkedPoNumber, setLinkedPoNumber] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Guards against a slow-to-resolve validation call landing after the
+  // input has already changed again — only the most recently fired
+  // request's result is allowed to update state.
+  const latestRequestId = useRef(0);
 
   useEffect(() => {
     setRefStatus("idle");
@@ -20,8 +25,10 @@ export function CreateDelivery({ onCreated }: { onCreated: () => void }) {
     if (!value) return;
 
     debounceRef.current = setTimeout(async () => {
+      const requestId = ++latestRequestId.current;
       setRefStatus("checking");
       const result = await validateReference(direction, value);
+      if (requestId !== latestRequestId.current) return;
       setRefStatus(result.valid ? "valid" : "invalid");
       setLinkedPoNumber(result.linked_po_number ?? null);
     }, 550);
@@ -34,12 +41,15 @@ export function CreateDelivery({ onCreated }: { onCreated: () => void }) {
 
   async function handleSubmit() {
     setSubmitting(true);
+    setSubmitError(null);
     try {
       await createDelivery(direction, referenceNumber);
       setReferenceNumber("");
       setRefStatus("idle");
       setLinkedPoNumber(null);
       onCreated();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "השליחה נכשלה, נסו שוב");
     } finally {
       setSubmitting(false);
     }
@@ -83,13 +93,16 @@ export function CreateDelivery({ onCreated }: { onCreated: () => void }) {
         )}
       </div>
 
-      <button
-        className="px-5 py-2 rounded-full bg-[var(--navy,#004370)] text-white disabled:opacity-40"
-        disabled={refStatus !== "valid" || submitting}
-        onClick={handleSubmit}
-      >
-        {submitting ? "שולח…" : "שליחה"}
-      </button>
+      <div>
+        <button
+          className="px-5 py-2 rounded-full bg-[var(--navy,#004370)] text-white disabled:opacity-40"
+          disabled={refStatus !== "valid" || submitting}
+          onClick={handleSubmit}
+        >
+          {submitting ? "שולח…" : "שליחה"}
+        </button>
+        {submitError && <div className="text-sm text-red-600 mt-2">{submitError}</div>}
+      </div>
     </div>
   );
 }

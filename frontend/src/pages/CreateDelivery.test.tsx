@@ -56,4 +56,56 @@ describe("CreateDelivery", () => {
     await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
     expect(createSpy).toHaveBeenCalledWith("EXPORT", "SHP-84213");
   });
+
+  it("shows an error and does not notify the parent when submit fails", async () => {
+    vi.spyOn(apiClient, "validateReference").mockResolvedValue({ valid: true });
+    vi.spyOn(apiClient, "createDelivery").mockRejectedValue(new Error("reference_number failed ERP validation"));
+    const onCreated = vi.fn();
+    const user = userEvent.setup();
+    render(<CreateDelivery onCreated={onCreated} />);
+
+    await user.type(screen.getByPlaceholderText(/מספר משלוח/), "SHP-84213");
+    await waitFor(() => expect(screen.getByRole("button", { name: "שליחה" })).toBeEnabled(), {
+      timeout: 2000,
+    });
+
+    await user.click(screen.getByRole("button", { name: "שליחה" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("reference_number failed ERP validation")).toBeInTheDocument()
+    );
+    expect(onCreated).not.toHaveBeenCalled();
+  });
+
+  it("ignores a stale validation response for a reference the user has since changed", async () => {
+    let resolveFirst!: (value: apiClient.ValidateReferenceResult) => void;
+    const firstCall = new Promise<apiClient.ValidateReferenceResult>((resolve) => {
+      resolveFirst = resolve;
+    });
+    vi.spyOn(apiClient, "validateReference")
+      .mockImplementationOnce(() => firstCall)
+      .mockResolvedValueOnce({ valid: false });
+
+    const user = userEvent.setup({ delay: null });
+    render(<CreateDelivery onCreated={() => {}} />);
+    const input = screen.getByPlaceholderText(/מספר משלוח/);
+
+    await user.type(input, "SHP-11111");
+    await waitFor(() => expect(screen.getByText("בודק מול ה-ERP…")).toBeInTheDocument(), {
+      timeout: 2000,
+    });
+
+    await user.clear(input);
+    await user.type(input, "SHP-99999");
+    await waitFor(() => expect(screen.getByText("לא נמצא ב-ERP — בדקו את המספר")).toBeInTheDocument(), {
+      timeout: 2000,
+    });
+
+    // The first (stale) call now resolves as valid — it must not override
+    // the already-rendered invalid state for the current input.
+    resolveFirst({ valid: true, linked_po_number: "PO-11111" });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByText("לא נמצא ב-ERP — בדקו את המספר")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "שליחה" })).toBeDisabled();
+  });
 });

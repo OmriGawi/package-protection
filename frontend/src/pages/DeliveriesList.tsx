@@ -3,15 +3,21 @@ import { listDeliveries, type Delivery } from "../api/client";
 
 export function DeliveriesList({ refreshKey }: { refreshKey: number }) {
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    listDeliveries().then(setDeliveries);
+    setError(null);
+    listDeliveries()
+      .then(setDeliveries)
+      .catch(() => setError("טעינת המשלוחים נכשלה"));
   }, [refreshKey]);
 
   return (
     <div className="max-w-xl bg-white rounded-xl shadow p-6">
       <h2 className="text-lg font-bold mb-4">המשלוחים שלי</h2>
-      {deliveries.length === 0 ? (
+      {error ? (
+        <p className="text-red-600">{error}</p>
+      ) : deliveries.length === 0 ? (
         <p className="text-gray-500">אין עדיין משלוחים.</p>
       ) : (
         <table className="w-full text-right">

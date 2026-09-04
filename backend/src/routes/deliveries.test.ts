@@ -47,6 +47,19 @@ describe("POST /api/deliveries + GET /api/deliveries", () => {
 
     expect(res.status).toBe(400);
   });
+
+  it("rejects a create request whose reference fails ERP validation, even without a prior validate-reference call", async () => {
+    const res = await request(app)
+      .post("/api/deliveries")
+      .send({ direction: "EXPORT", reference_number: "NOT-A-REAL-SHIPMENT" });
+
+    expect(res.status).toBe(422);
+
+    const listRes = await request(app).get("/api/deliveries");
+    expect(
+      listRes.body.some((d: { referenceNumber: string }) => d.referenceNumber === "NOT-A-REAL-SHIPMENT")
+    ).toBe(false);
+  });
 });
 
 afterAll(async () => {
