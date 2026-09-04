@@ -1,4 +1,10 @@
-import type { Direction, Package, Verdict, WorkflowStatus } from "../api/client";
+import type {
+  DeliveryStatusKey,
+  Direction,
+  Package,
+  Verdict,
+  WorkflowStatus,
+} from "../api/client";
 
 // Copy taken verbatim from ui/index.html's DIRECTION_TEXT / WORKFLOW_TEXT /
 // VERDICT_INFO, mapped onto the schema's enum values.
@@ -46,3 +52,26 @@ export function formatDate(isoTimestamp: string): string {
     year: "numeric",
   });
 }
+
+/**
+ * The one status a delivery row shows (DESIGN.md §4.3). Colors follow the
+ * package-level meanings — including CHECK_FAILED as purple, not red, since a
+ * failed call is an operational hiccup and not evidence of tampering.
+ */
+export const DELIVERY_STATUS_INFO: Record<DeliveryStatusKey, BadgeInfo> = {
+  OPENED: { text: "חבילה נפתחה", color: "var(--red)", bg: "var(--red-soft)" },
+  CHECK_FAILED: { text: "שגיאה בבדיקה", color: "var(--purple)", bg: "var(--purple-soft)" },
+  INCONCLUSIVE: { text: "דורש בדיקה", color: "var(--amber)", bg: "var(--amber-soft)" },
+  AWAITING_RECEIPT: { text: "ממתין לתמונות קבלה", color: "var(--blue)", bg: "var(--blue-soft)" },
+  COMPLETE: { text: "הושלם", color: "var(--green)", bg: "var(--green-soft)" },
+};
+
+/** Chip order matches the priority ladder, worst first. */
+export const STATUS_FILTERS: { key: DeliveryStatusKey | "ALL"; label: string }[] = [
+  { key: "ALL", label: "הכל" },
+  { key: "OPENED", label: DELIVERY_STATUS_INFO.OPENED.text },
+  { key: "CHECK_FAILED", label: DELIVERY_STATUS_INFO.CHECK_FAILED.text },
+  { key: "INCONCLUSIVE", label: DELIVERY_STATUS_INFO.INCONCLUSIVE.text },
+  { key: "AWAITING_RECEIPT", label: DELIVERY_STATUS_INFO.AWAITING_RECEIPT.text },
+  { key: "COMPLETE", label: DELIVERY_STATUS_INFO.COMPLETE.text },
+];

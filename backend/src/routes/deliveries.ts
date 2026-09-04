@@ -12,6 +12,12 @@ import {
 } from "../lib/photoUpload";
 import { CURRENT_USER } from "../lib/currentUser";
 import { validateReference, type Direction } from "../services/erpMock";
+import {
+  DELIVERY_STATUSES,
+  findDeliveryPage,
+  isDeliveryStatus,
+  type DeliveryStatusKey,
+} from "../services/deliveryQuery";
 
 export const deliveriesRouter = Router();
 
@@ -151,18 +157,41 @@ deliveriesRouter.post("/", upload.any(), async (req, res) => {
   }
 });
 
-deliveriesRouter.get("/", async (_req, res) => {
-  const deliveries = await prisma.delivery.findMany({
-    orderBy: { internalNumber: "desc" },
-    include: { _count: { select: { packages: true } } },
+deliveriesRouter.get("/", async (req, res) => {
+  const { search, status, page } = req.query as {
+    search?: unknown;
+    status?: unknown;
+    page?: unknown;
+  };
+
+  // Express 5 turns a repeated ?search=a&search=b into an array; calling
+  // .trim() on it would 500 rather than answer.
+  for (const [name, value] of Object.entries({ search, status, page })) {
+    if (value !== undefined && typeof value !== "string") {
+      return res.status(400).json({ error: `${name} must be given at most once` });
+    }
+  }
+
+  // Rejected rather than coerced: silently serving page 1 of everything for a
+  // typo'd filter looks exactly like a filter that matched nothing.
+  if (status !== undefined && !isDeliveryStatus(status as string)) {
+    return res.status(400).json({
+      error: `status must be one of ${DELIVERY_STATUSES.join(", ")}`,
+    });
+  }
+
+  const pageNumber = page === undefined ? 1 : Number(page);
+  if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+    return res.status(400).json({ error: "page must be a positive integer" });
+  }
+
+  const result = await findDeliveryPage({
+    search: (search as string | undefined)?.trim() || undefined,
+    status: status as DeliveryStatusKey | undefined,
+    page: pageNumber,
   });
 
-  res.json(
-    deliveries.map(({ _count, ...delivery }) => ({
-      ...delivery,
-      packageCount: _count.packages,
-    }))
-  );
+  res.json(result);
 });
 
 deliveriesRouter.get("/:id", async (req, res) => {

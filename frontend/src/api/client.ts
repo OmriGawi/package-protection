@@ -30,8 +30,34 @@ export interface Delivery {
   createdAt: string;
 }
 
-export interface DeliveryListItem extends Delivery {
+export type DeliveryStatusKey =
+  | "OPENED"
+  | "CHECK_FAILED"
+  | "INCONCLUSIVE"
+  | "AWAITING_RECEIPT"
+  | "COMPLETE";
+
+/**
+ * A row of the deliveries list. Deliberately not `extends Delivery`: the list
+ * endpoint doesn't return the persisted `status` (always SUBMITTED), and
+ * `attentionStatus` is a different thing entirely — derived from the packages,
+ * it's the most urgent true thing about the delivery (DESIGN.md §4.3).
+ */
+export interface DeliveryListItem {
+  id: string;
+  internalNumber: number;
+  direction: Direction;
+  referenceNumber: string;
+  createdAt: string;
   packageCount: number;
+  attentionStatus: DeliveryStatusKey;
+}
+
+export interface DeliveryPage {
+  items: DeliveryListItem[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface DeliveryDetail extends Delivery {
@@ -87,8 +113,23 @@ export function createDelivery(direction: Direction, referenceNumber: string, pa
   return request<DeliveryDetail>("/api/deliveries", { method: "POST", body: form });
 }
 
-export function listDeliveries() {
-  return request<DeliveryListItem[]>("/api/deliveries");
+/** Search, status filter and paging all happen server-side (DESIGN.md §4.3). */
+export function listDeliveries({
+  search,
+  status,
+  page,
+}: {
+  search?: string;
+  status?: DeliveryStatusKey;
+  page?: number;
+} = {}) {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  if (status) params.set("status", status);
+  if (page && page > 1) params.set("page", String(page));
+
+  const query = params.toString();
+  return request<DeliveryPage>(`/api/deliveries${query ? `?${query}` : ""}`);
 }
 
 export function getDelivery(id: string) {
