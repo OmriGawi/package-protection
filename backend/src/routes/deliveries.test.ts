@@ -203,13 +203,39 @@ describe("POST /api/deliveries", () => {
 });
 
 describe("GET /api/deliveries and /api/deliveries/:id", () => {
+  it("rejects an unknown status instead of quietly listing everything", async () => {
+    const res = await request(app).get("/api/deliveries?status=SLIGHTLY_OPENED");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/status must be one of/);
+  });
+
+  it.each(["0", "-1", "abc"])("rejects page=%s", async (page) => {
+    const res = await request(app).get(`/api/deliveries?page=${page}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/page must be/);
+  });
+
+  it("returns a page envelope, not a bare array", async () => {
+    const res = await request(app).get("/api/deliveries");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ page: 1, pageSize: 20 });
+    expect(Array.isArray(res.body.items)).toBe(true);
+    expect(res.body.items.length).toBeLessThanOrEqual(20);
+    expect(typeof res.body.total).toBe("number");
+  });
+
   it("lists deliveries with their package count and serves the detail with images", async () => {
     const created = await submitDelivery([{ label: 1, photos: 4 }]);
     expect(created.status).toBe(201);
 
-    const listRes = await request(app).get("/api/deliveries");
+    const listRes = await request(app).get(
+      `/api/deliveries?search=${created.body.referenceNumber}`
+    );
     expect(listRes.status).toBe(200);
-    const listed = listRes.body.find((d: { id: string }) => d.id === created.body.id);
+    const listed = listRes.body.items.find((d: { id: string }) => d.id === created.body.id);
     expect(listed.packageCount).toBe(1);
 
     const detailRes = await request(app).get(`/api/deliveries/${created.body.id}`);
@@ -243,4 +269,14 @@ describe("GET /api/images/:id", () => {
 
 afterAll(async () => {
   await prisma.$disconnect();
+});
+
+describe("GET /api/deliveries query validation", () => {
+  it("rejects a repeated parameter instead of 500ing on it", async () => {
+    // Express 5 hands a repeated param over as an array.
+    const res = await request(app).get("/api/deliveries?search=a&search=b");
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/at most once/);
+  });
 });

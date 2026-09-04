@@ -43,6 +43,10 @@ risky.
    considering the work finished or offering to merge. Fix what it finds,
    or say explicitly why not.
 
+   `code-review` is the skill that actually reads the diff; `caveman-review`
+   only governs how a finding is worded (one line: location, problem, fix).
+   Use both — they compose, they are not alternatives.
+
 Only after all five steps does a slice count as done. Merging
 `feat/*` → `main` is a separate, explicit checkpoint per the git-flow
 already in use for this repo — this skill governs getting a branch to a

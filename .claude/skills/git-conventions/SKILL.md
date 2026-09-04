@@ -1,69 +1,61 @@
 ---
 name: git-conventions
-description: Use for any git or GitHub action in this repo — committing, branching, opening a PR, writing a commit message. Defines this project's git flow, branch naming, staging discipline and PR conventions (commit message format is delegated to the caveman-commit skill), and states explicitly that AI attribution is never added (enforced via .claude/settings.json's attribution config, but restated here as the rule to follow even if that config is ever missing).
+description: Use for any git or GitHub action in this repo — committing, branching, staging, opening a PR. Defines branch flow, commit scope vocabulary, staging discipline and PR shape. Message format is delegated to the caveman-commit skill and review-comment format to caveman-review; AI attribution is blocked by .claude/settings.json's attribution config.
 ---
 
 # Git & GitHub conventions
 
-This repo's standing rules for git and GitHub, not a general git tutorial.
-Apply these on every commit, branch, and PR — don't ask each time.
+Repo-specific rules only. Format is delegated:
 
-## No AI attribution, ever
+- Commit messages — `caveman-commit`. Don't hand-write them here.
+- Review comments — `caveman-review` for wording; `code-review` is what
+  actually reads the diff (see `dev-workflow` step 5).
+- AI attribution — `.claude/settings.json` sets `attribution.commit` and
+  `attribution.pr` to empty strings. Nothing to restate; don't add a
+  trailer or footer back manually.
 
-Never add a "Co-Authored-By: Claude" trailer to commits, and never add a
-"Generated with Claude Code" (or similar) footer to PR descriptions. This
-repo's `.claude/settings.json` sets `attribution.commit` and
-`attribution.pr` to empty strings to enforce this — if that file is ever
-missing or reverted, the rule still stands: don't add it back manually.
-The user owns every commit in their own name; keep history clean.
+General safety rules (never force-push `main`, never `--no-verify`, check
+`git status` before any destructive command) are project-wide policy and
+are deliberately not repeated here.
 
-## Branch flow (GitHub flow, not git-flow)
+## Branch flow (GitHub flow)
 
-- `main` is always deployable. No `develop`/`release`/`hotfix` branches —
-  that's overhead this project doesn't need.
-- One short-lived branch per unit of work, named `feat/<slice-or-feature>`
-  or `fix/<bug>` — e.g. `feat/slice-1-create-delivery`,
-  `fix/erp-validation-race`.
-- A branch is mergeable once it's been through the full dev-workflow
-  loop (plan, implement, tests written and passing, code review done —
-  see the `dev-workflow` skill). Merging to `main` is a separate,
-  explicit checkpoint — confirm with the user before merging, don't do
-  it silently as the last step of a slice.
-- Delete the branch after merging; don't let merged branches pile up.
+- `main` is always deployable. No `develop`/`release`/`hotfix` branches.
+- One short-lived branch per unit of work: `feat/<slice-or-feature>` or
+  `fix/<bug>` — e.g. `feat/slice-1-create-delivery`.
+- A branch is mergeable once it has been through the full `dev-workflow`
+  loop. Merging to `main` is a separate, explicit checkpoint — confirm
+  with the user, never as the silent last step of a slice.
+- Delete the branch after merging.
 
-## Commit messages
-
-**Format is owned by the `caveman-commit` skill — use it, don't hand-write
-messages here.** Conventional Commits, `<type>(<scope>): <imperative
-summary>`, body only when the *why* isn't obvious.
-
-Adopted 2026-09-05. Commits before that point are prose subjects
-("Slice 3: receiving and the dummy tamper-check API"); the switch point is
-deliberate, so don't reformat history to match.
-
-What stays this repo's rule regardless of format:
+## Commits
 
 - One logical change per commit. Don't bundle an unrelated fix into a
   feature commit just because you noticed it along the way.
-- Stage deliberately (`git add <specific files>`), never a blind `git add
-  -A`/`.` without reviewing `git status` first — this repo has caught a
-  stray install landing at the wrong path before (see `.gitignore` and
-  the backend/frontend split); a careless add would have committed it.
-- Scope names follow the repo layout: `backend`, `frontend`, `db`,
-  `skills`, `docs`, `ci`.
+- Stage deliberately (`git add <specific files>`), never a blind
+  `git add -A`/`.` without reviewing `git status` first — this repo has
+  caught a stray install landing at the wrong path before.
+- Scopes follow the repo layout: `backend`, `frontend`, `db`, `skills`,
+  `docs`, `ci`. Pass these to `caveman-commit`; it can't guess them.
+- Body caps at ~8 lines. One paragraph per non-obvious decision, three
+  max. Code-review fixes are not a commit-body section — the diff and
+  the PR carry them.
 
-## Pull requests (once this repo has a GitHub remote)
+## Pull requests
+
+This repo has no GitHub remote yet (`git remote -v` is empty), so these
+apply from the day one is added:
 
 - Title under ~70 characters.
-- Body: a short **Summary** (what changed, bulleted) and a **Test plan**
-  (what was actually run/verified — tests, manual browser check, curl).
-  No AI-generated footer (see above).
-- Only open a PR / push when the user asks for it — same rule as any
-  other action visible to others.
+- Body in normal prose: a short **Summary** (bulleted) and a **Test plan**
+  (what was actually run — tests, typecheck, manual browser check).
+  A PR body is read by humans outside this session, so it is not written
+  in caveman register. Inline review *comments* are the exception, and
+  follow `caveman-review`.
+- Only open a PR or push when the user asks.
 
-## Safety defaults (restated, already project-wide policy)
+## History note
 
-Never force-push `main`, never `--no-verify`/skip hooks, never
-`git reset --hard`/`git clean` without checking `git status` first and
-confirming with the user. These aren't special to this repo — just worth
-having in one place alongside the rest of the git conventions.
+Conventional Commits adopted 2026-09-05. Commits before that point have
+prose subjects ("Slice 3: receiving and the dummy tamper-check API"). The
+switch point is deliberate — don't reformat history to match.

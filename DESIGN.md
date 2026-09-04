@@ -617,3 +617,34 @@ changelog entries.
   which matters because the number is written on a physical box), and photo
   formats are restricted and sniffed from the file's bytes (§3), which is
   what surfaced the HEIC problem now recorded in §9.
+- 2026-09-05: **Slice 3 — Receiving + tamper-check API**: closed the
+  ship-then-receive loop (§4.2). A shipped package takes post-receive
+  photos and gets a verdict from a stand-in service that fills in for the
+  third-party API of §9, kept behind a `TamperCheckClient` seam so the
+  real one swaps in at a single file rather than through the routes. The
+  `TamperCheck` model (§3) records the verdict per package. Added
+  `TAMPER_CHECK_OUTCOME` so a demo can pin the stand-in's answer instead
+  of taking whatever it invents. One process lesson, not a product one:
+  the build was broken for most of a slice while the test suite stayed
+  green, because Vitest strips types without checking them — the build
+  now has its own tsconfig, and typecheck is a required step alongside
+  tests before any slice counts as done.
+  **Slice 4 — Deliveries list that can be acted on**: the landing page
+  (§4.3) rendered every delivery ever created and could not answer the
+  question it exists for — "do I need to act on this". Each row now
+  carries a derived `attentionStatus`: the §4.3 priority ladder computed
+  in SQL from the delivery's packages, where an opened or failed-call
+  package outranks awaiting-receipt even while the rest of the delivery
+  is still in transit. Deliberately not called `status`, since
+  `Delivery.status` already persists `SUBMITTED` and means something
+  else. Search, filter, sort and paging all run in Postgres, so a page
+  is 20 rows whatever the history grows to. Two things surfaced by
+  building it: the page total has to be counted separately rather than
+  with `COUNT(*) OVER()`, because a window function rides on the
+  returned rows and would report 0 for a page past the end — exactly
+  when the pager still needs the total to get back; and search has to
+  escape LIKE wildcards, since bound parameters stop SQL injection but
+  not pattern injection, and an unescaped `%` returns the whole table.
+  Also deleted 10 package-less deliveries left over from Slice 1, before
+  packages existed — nothing can create one now, and hiding them with an
+  INNER JOIN would have dropped rows from the list without saying so.
