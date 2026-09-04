@@ -83,3 +83,70 @@ table {
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   border: 1px solid var(--border);
 }
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border: 1.5px dashed #00000022;
+  border-radius: 12px;
+  padding: 20px 16px;
+  cursor: pointer;
+  background: #fbfbfc;
+  text-align: center;
+}
+.dropzone:hover {
+  border-color: var(--blue);
+  background: var(--blue-soft);
+}
+.dropzone.is-disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.thumb {
+  position: relative;
+  width: 100%;
+  padding-top: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #eee;
+  border: 1px solid var(--border);
+}
+.thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.thumb-flag {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+.thumb-remove {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}

@@ -1,24 +1,34 @@
 import { useEffect, useRef, useState } from "react";
-import { createDelivery, validateReference, type Direction } from "../api/client";
+import { validateReference, type Direction } from "../api/client";
 
 type RefStatus = "idle" | "checking" | "valid" | "invalid";
 
-export function CreateDelivery({ onCreated }: { onCreated: () => void }) {
-  const [direction, setDirection] = useState<Direction>("EXPORT");
-  const [referenceNumber, setReferenceNumber] = useState("");
+export function DeliveryDetailsCard({
+  direction,
+  referenceNumber,
+  onDirectionChange,
+  onReferenceNumberChange,
+  onValidityChange,
+}: {
+  direction: Direction;
+  referenceNumber: string;
+  onDirectionChange: (direction: Direction) => void;
+  onReferenceNumberChange: (referenceNumber: string) => void;
+  onValidityChange: (valid: boolean) => void;
+}) {
   const [refStatus, setRefStatus] = useState<RefStatus>("idle");
   const [linkedPoNumber, setLinkedPoNumber] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Guards against a slow-to-resolve validation call landing after the
-  // input has already changed again — only the most recently fired
-  // request's result is allowed to update state.
+  // Guards against a slow-to-resolve validation call landing after the input
+  // has already changed again — only the newest request may update state.
   const latestRequestId = useRef(0);
+  const onValidityChangeRef = useRef(onValidityChange);
+  onValidityChangeRef.current = onValidityChange;
 
   useEffect(() => {
     setRefStatus("idle");
     setLinkedPoNumber(null);
+    onValidityChangeRef.current(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const value = referenceNumber.trim();
@@ -31,59 +41,34 @@ export function CreateDelivery({ onCreated }: { onCreated: () => void }) {
       if (requestId !== latestRequestId.current) return;
       setRefStatus(result.valid ? "valid" : "invalid");
       setLinkedPoNumber(result.linked_po_number ?? null);
+      onValidityChangeRef.current(result.valid);
     }, 550);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [referenceNumber, direction]);
-
-  async function handleSubmit() {
-    setSubmitting(true);
-    setSubmitError(null);
-    try {
-      await createDelivery(direction, referenceNumber);
-      setReferenceNumber("");
-      setRefStatus("idle");
-      setLinkedPoNumber(null);
-      onCreated();
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : "השליחה נכשלה, נסו שוב");
-    } finally {
-      setSubmitting(false);
-    }
-  }
 
   return (
     <div className="card" style={{ padding: "26px 28px", height: "fit-content" }}>
       <div className="text-[13.5px] font-bold mb-5">פרטי המשלוח</div>
 
       <div className="inline-flex rounded-lg overflow-hidden mb-6" style={{ border: "1px solid #00000018" }}>
-        <button
-          type="button"
-          onClick={() => setDirection("EXPORT")}
-          className="px-6 py-2.5 text-sm font-semibold transition"
-          style={
-            direction === "EXPORT"
-              ? { background: "var(--blue)", color: "#fff" }
-              : { background: "#fff", color: "var(--text-secondary)" }
-          }
-        >
-          ייצוא
-        </button>
-        <button
-          type="button"
-          onClick={() => setDirection("IMPORT")}
-          className="px-6 py-2.5 text-sm font-semibold transition"
-          style={
-            direction === "IMPORT"
-              ? { background: "var(--blue)", color: "#fff" }
-              : { background: "#fff", color: "var(--text-secondary)" }
-          }
-        >
-          יבוא
-        </button>
+        {(["EXPORT", "IMPORT"] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => onDirectionChange(value)}
+            className="px-6 py-2.5 text-sm font-semibold transition"
+            style={
+              direction === value
+                ? { background: "var(--blue)", color: "#fff" }
+                : { background: "#fff", color: "var(--text-secondary)" }
+            }
+          >
+            {value === "EXPORT" ? "ייצוא" : "יבוא"}
+          </button>
+        ))}
       </div>
 
       <label htmlFor="reference-number" className="block text-[12.5px] font-semibold mb-2.5">
@@ -97,7 +82,7 @@ export function CreateDelivery({ onCreated }: { onCreated: () => void }) {
           dir="ltr"
           placeholder={direction === "EXPORT" ? "SHP-88291" : "PO-88291"}
           value={referenceNumber}
-          onChange={(e) => setReferenceNumber(e.target.value)}
+          onChange={(e) => onReferenceNumberChange(e.target.value)}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"
@@ -130,7 +115,13 @@ export function CreateDelivery({ onCreated }: { onCreated: () => void }) {
           </span>
         )}
       </div>
-      <p className="mt-2 text-[12px]" style={{ minHeight: 16, color: refStatus === "valid" ? "var(--green)" : refStatus === "invalid" ? "var(--red)" : "var(--text-secondary)" }}>
+      <p
+        className="mt-2 text-[12px]"
+        style={{
+          minHeight: 16,
+          color: refStatus === "valid" ? "var(--green)" : refStatus === "invalid" ? "var(--red)" : "var(--text-secondary)",
+        }}
+      >
         {refStatus === "checking" && "בודק מול ה-ERP…"}
         {refStatus === "valid" && "אומת מול ה-ERP"}
         {refStatus === "invalid" && "לא נמצא ב-ERP — בדקו את המספר"}
@@ -149,17 +140,6 @@ export function CreateDelivery({ onCreated }: { onCreated: () => void }) {
             {linkedPoNumber}
           </span>
         </div>
-      )}
-
-      <div className="flex justify-end mt-6">
-        <button className="btn-primary" disabled={refStatus !== "valid" || submitting} onClick={handleSubmit}>
-          {submitting ? "שולח…" : "שליחה"}
-        </button>
-      </div>
-      {submitError && (
-        <p className="mt-2 text-[12px]" style={{ color: "var(--red)" }}>
-          {submitError}
-        </p>
       )}
     </div>
   );

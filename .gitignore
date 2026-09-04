@@ -1,6 +1,7 @@
 node_modules/
 dist/
 build/
+backend/storage/
 .env
 .env.*
 !.env.example
