@@ -1,6 +1,6 @@
 ---
 name: git-conventions
-description: Use for any git or GitHub action in this repo — committing, branching, opening a PR, writing a commit message. Defines this project's git flow, branch naming, commit message style, and PR conventions, and states explicitly that AI attribution is never added (enforced via .claude/settings.json's attribution config, but restated here as the rule to follow even if that config is ever missing).
+description: Use for any git or GitHub action in this repo — committing, branching, opening a PR, writing a commit message. Defines this project's git flow, branch naming, staging discipline and PR conventions (commit message format is delegated to the caveman-commit skill), and states explicitly that AI attribution is never added (enforced via .claude/settings.json's attribution config, but restated here as the rule to follow even if that config is ever missing).
 ---
 
 # Git & GitHub conventions
@@ -33,16 +33,24 @@ The user owns every commit in their own name; keep history clean.
 
 ## Commit messages
 
-- Imperative summary line ("Add X", "Fix Y", not "Added X" or "Adds X"),
-  under ~70 characters, no trailing period.
-- Body explains **why**, not what the diff already shows — the reasoning,
-  the tradeoff, the bug being fixed. Wrap around 72 chars.
+**Format is owned by the `caveman-commit` skill — use it, don't hand-write
+messages here.** Conventional Commits, `<type>(<scope>): <imperative
+summary>`, body only when the *why* isn't obvious.
+
+Adopted 2026-09-05. Commits before that point are prose subjects
+("Slice 3: receiving and the dummy tamper-check API"); the switch point is
+deliberate, so don't reformat history to match.
+
+What stays this repo's rule regardless of format:
+
 - One logical change per commit. Don't bundle an unrelated fix into a
   feature commit just because you noticed it along the way.
 - Stage deliberately (`git add <specific files>`), never a blind `git add
   -A`/`.` without reviewing `git status` first — this repo has caught a
   stray install landing at the wrong path before (see `.gitignore` and
   the backend/frontend split); a careless add would have committed it.
+- Scope names follow the repo layout: `backend`, `frontend`, `db`,
+  `skills`, `docs`, `ci`.
 
 ## Pull requests (once this repo has a GitHub remote)
 
