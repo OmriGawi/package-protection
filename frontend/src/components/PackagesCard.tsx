@@ -1,32 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import type { DraftPackage } from "../api/client";
 import { nextPackageLabel } from "../lib/packageLabels";
-
-const MIN_PHOTOS = 4;
-
-// Must stay in step with the backend's allowlist (backend/src/lib/imageTypes.ts):
-// anything the server would reject should be flagged here first, rather than
-// failing the whole submit after the employee has assembled the delivery.
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
-
-interface DraftPhoto {
-  id: string;
-  file: File;
-  url: string;
-  valid: boolean;
-  reason: string;
-}
-
-function toDraftPhoto(file: File): DraftPhoto {
-  const isAllowed = ALLOWED_TYPES.includes(file.type);
-  return {
-    id: `${file.name}-${file.lastModified}-${Math.random().toString(36).slice(2)}`,
-    file,
-    url: URL.createObjectURL(file),
-    valid: isAllowed,
-    reason: isAllowed ? "" : "לא קובץ תמונה",
-  };
-}
+import { usePhotoDraft } from "../lib/usePhotoDraft";
+import { PhotoDraftThumbs, PhotoDropzone } from "./PhotoPicker";
 
 export function PackagesCard({
   enabled,
@@ -37,49 +13,21 @@ export function PackagesCard({
   packages: DraftPackage[];
   onChange: (packages: DraftPackage[]) => void;
 }) {
-  const [photoDraft, setPhotoDraft] = useState<DraftPhoto[]>([]);
+  const draft = usePhotoDraft();
   const [editingId, setEditingId] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Navigating away mid-draft (e.g. the back link) would otherwise strand
-  // every blob URL still held by the thumbnails.
-  const photoDraftRef = useRef(photoDraft);
-  photoDraftRef.current = photoDraft;
-  useEffect(() => () => photoDraftRef.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
-
-  const validPhotos = photoDraft.filter((p) => p.valid);
   const editingPackage = packages.find((p) => p.id === editingId) ?? null;
   const currentLabel = editingPackage ? editingPackage.label : nextPackageLabel(packages);
-  const canSavePackage = enabled && validPhotos.length >= MIN_PHOTOS;
+  const canSavePackage = enabled && draft.hasEnough;
 
-  function handleFilesPicked(event: React.ChangeEvent<HTMLInputElement>) {
-    const picked = Array.from(event.target.files ?? []);
-    setPhotoDraft((current) => [...current, ...picked.map(toDraftPhoto)]);
-    event.target.value = "";
-  }
-
-  // Every thumbnail holds a blob URL the browser keeps alive until it's
-  // revoked — without this, a few packages of phone photos leak hundreds of MB
-  // for as long as the tab stays open.
-  function removeDraftPhoto(id: string) {
-    setPhotoDraft((current) => {
-      const going = current.find((p) => p.id === id);
-      if (going) URL.revokeObjectURL(going.url);
-      return current.filter((p) => p.id !== id);
-    });
-  }
-
-  function resetDraft() {
-    setPhotoDraft((current) => {
-      current.forEach((p) => URL.revokeObjectURL(p.url));
-      return [];
-    });
+  function cancelEdit() {
+    draft.clear();
     setEditingId(null);
   }
 
   function savePackage() {
     if (!canSavePackage) return;
-    const photos = validPhotos.map((p) => p.file);
+    const photos = draft.valid.map((p) => p.file);
 
     if (editingPackage) {
       onChange(packages.map((p) => (p.id === editingPackage.id ? { ...p, photos } : p)));
@@ -89,25 +37,22 @@ export function PackagesCard({
         { id: `pkg-${Date.now()}-${Math.random().toString(36).slice(2)}`, label: currentLabel, photos },
       ]);
     }
-    resetDraft();
+    cancelEdit();
   }
 
   function editPackage(pkg: DraftPackage) {
     if (pkg.id === editingId) return;
     // Opening a package replaces whatever is in the upload area, so a mis-click
     // here would silently bin photos the employee just picked for the next box.
-    if (photoDraft.length > 0 && !window.confirm("התמונות שטרם נשמרו יימחקו. להמשיך?")) return;
+    if (draft.photos.length > 0 && !window.confirm("התמונות שטרם נשמרו יימחקו. להמשיך?")) return;
 
-    setPhotoDraft((current) => {
-      current.forEach((p) => URL.revokeObjectURL(p.url));
-      return pkg.photos.map(toDraftPhoto);
-    });
+    draft.replace(pkg.photos);
     setEditingId(pkg.id);
   }
 
   function removePackage(pkg: DraftPackage, event: React.MouseEvent) {
     event.stopPropagation();
-    if (pkg.id === editingId) resetDraft();
+    if (pkg.id === editingId) cancelEdit();
     onChange(packages.filter((p) => p.id !== pkg.id));
   }
 
@@ -187,60 +132,18 @@ export function PackagesCard({
             )}
           </div>
           {editingPackage && (
-            <button type="button" onClick={resetDraft} className="text-[12px] font-semibold" style={{ color: "var(--text-secondary)" }}>
+            <button type="button" onClick={cancelEdit} className="text-[12px] font-semibold" style={{ color: "var(--text-secondary)" }}>
               ביטול עריכה
             </button>
           )}
         </div>
 
         <label className="block text-[12.5px] font-semibold mb-2.5">
-          תמונות — {validPhotos.length} מתוך 4+ מינימום
+          תמונות — {draft.valid.length} מתוך 4+ מינימום
         </label>
 
-        <label className={`dropzone${enabled ? "" : " is-disabled"}`}>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ALLOWED_TYPES.join(",")}
-            multiple
-            onChange={handleFilesPicked}
-            disabled={!enabled}
-            style={{ display: "none" }}
-          />
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00000055" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M7 18a4 4 0 01-1-7.87A5.5 5.5 0 0116.9 8H17a4 4 0 011 7.87" />
-            <path d="M12 12v7" />
-            <path d="M9 15l3-3 3 3" />
-          </svg>
-          <span className="text-[12.5px] font-semibold">לחצו להעלאת תמונות</span>
-          <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
-            JPG או PNG — לפחות 4 תמונות של החבילה
-          </span>
-        </label>
-
-        <div className="grid gap-2.5 mt-3.5" style={{ gridTemplateColumns: "repeat(6,1fr)" }}>
-          {photoDraft.map((photo) => (
-            <div key={photo.id} className="thumb">
-              <img src={photo.url} alt="" />
-              <span className="thumb-flag" title={photo.reason} style={{ background: photo.valid ? "var(--green)" : "var(--red)" }}>
-                {photo.valid ? (
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6L9 17l-5-5" />
-                  </svg>
-                ) : (
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                )}
-              </span>
-              <button type="button" aria-label="הסרת תמונה" className="thumb-remove" onClick={() => removeDraftPhoto(photo.id)}>
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 6L6 18M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          ))}
-        </div>
+        <PhotoDropzone disabled={!enabled} onPick={draft.add} />
+        <PhotoDraftThumbs photos={draft.photos} onRemove={draft.remove} />
 
         <div className="flex justify-end mt-5">
           <button type="button" className="btn-primary" disabled={!canSavePackage} onClick={savePackage}>

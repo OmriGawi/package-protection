@@ -72,8 +72,35 @@ model Package {
   overrideNote        String?
 
   images PackageImage[]
+  checks TamperCheck[]
 
   @@unique([deliveryId, label])
+}
+
+enum CheckStatus {
+  PENDING
+  COMPLETE
+  ERROR
+}
+
+// One row per attempt at the tamper-detection call, so a retry after a failed
+// call leaves an audit trail rather than overwriting one (DESIGN.md §3).
+model TamperCheck {
+  id        String  @id @default(uuid())
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  // Null while PENDING, and on ERROR — a failed call produced no verdict.
+  verdict Verdict?
+  // Unknown whether the real API exposes a score; kept so a future
+  // score → INTACT/OPENED/INCONCLUSIVE threshold has somewhere to live (§3).
+  confidenceScore Float?
+  // Whatever the API returned, stored verbatim.
+  rawResponse Json?
+
+  status      CheckStatus @default(PENDING)
+  requestedAt DateTime    @default(now()) @db.Timestamptz(3)
+  completedAt DateTime?   @db.Timestamptz(3)
 }
 
 model PackageImage {

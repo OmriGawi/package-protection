@@ -1,0 +1,117 @@
+import type { Verdict } from "@prisma/client";
+
+/**
+ * One image as handed to the tamper-detection service.
+ *
+ * `storagePath` rather than bytes: whether the real API wants raw files, URLs
+ * or base64 is still open (DESIGN.md §9), so the client implementation — not
+ * its callers — decides how to turn a stored image into whatever the service
+ * expects.
+ */
+export interface TamperCheckImage {
+  id: string;
+  storagePath: string;
+  sequence: number;
+}
+
+/**
+ * Two *sets*, deliberately not pre-paired: whether correspondence is
+ * positional (front-before ↔ front-after) or something the service works out
+ * itself is an open question (§9), so we hand over everything we have and let
+ * the implementation decide.
+ */
+export interface TamperCheckInput {
+  packageId: string;
+  preShip: TamperCheckImage[];
+  postReceive: TamperCheckImage[];
+}
+
+export interface TamperCheckResult {
+  verdict: Verdict;
+  /** Null unless the service exposes one; a score → verdict threshold would be ours to define (§3). */
+  confidenceScore: number | null;
+  /** Whatever the service returned, stored verbatim on the TamperCheck row. */
+  raw: unknown;
+}
+
+/**
+ * The seam the real third-party service will slot into. Nothing above this
+ * interface knows how the check is performed — swapping the mock for the real
+ * client should touch this file and nothing else.
+ */
+export interface TamperCheckClient {
+  check(input: TamperCheckInput): Promise<TamperCheckResult>;
+}
+
+/** Thrown when the call itself fails, as distinct from returning a verdict. */
+export class TamperCheckCallError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TamperCheckCallError";
+  }
+}
+
+export type MockOutcome = Verdict | "CALL_FAILED";
+
+// Same weighting as ui/index.html's runTamperCheck: mostly intact, with the
+// occasional opened, inconclusive, and outright call failure.
+const WEIGHTED_OUTCOMES: MockOutcome[] = [
+  "INTACT",
+  "INTACT",
+  "INTACT",
+  "INTACT",
+  "OPENED",
+  "INCONCLUSIVE",
+  "CALL_FAILED",
+];
+
+export function pickWeightedOutcome(): MockOutcome {
+  return WEIGHTED_OUTCOMES[Math.floor(Math.random() * WEIGHTED_OUTCOMES.length)];
+}
+
+/**
+ * Stand-in for the real tamper-detection API, which we have no access to and
+ * no contract for yet (DESIGN.md §9). It ignores the images entirely — it is
+ * not detecting anything — and just reproduces the shape of the interaction:
+ * a slow call that usually says "intact", sometimes flags a package, and
+ * sometimes fails outright.
+ */
+export class MockTamperCheckClient implements TamperCheckClient {
+  constructor(
+    private readonly pickOutcome: () => MockOutcome = pickWeightedOutcome,
+    private readonly delayMs = 1800
+  ) {}
+
+  async check(input: TamperCheckInput): Promise<TamperCheckResult> {
+    await new Promise((resolve) => setTimeout(resolve, this.delayMs));
+
+    const outcome = this.pickOutcome();
+    if (outcome === "CALL_FAILED") {
+      throw new TamperCheckCallError("tamper-detection service is unavailable");
+    }
+
+    return {
+      verdict: outcome,
+      confidenceScore: null,
+      raw: {
+        mock: true,
+        verdict: outcome,
+        comparedPreShip: input.preShip.length,
+        comparedPostReceive: input.postReceive.length,
+      },
+    };
+  }
+}
+
+// The client in use. Swapping this for the real service's implementation is
+// the whole point of the interface above; tests swap it for a deterministic
+// stub so they don't depend on a 1-in-7 outcome or wait 1.8s per check.
+let activeClient: TamperCheckClient = new MockTamperCheckClient();
+
+export function getTamperCheckClient(): TamperCheckClient {
+  return activeClient;
+}
+
+export function setTamperCheckClient(client: TamperCheckClient): void {
+  activeClient = client;
+}
