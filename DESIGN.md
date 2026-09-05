@@ -167,6 +167,19 @@ just a card unlocking in place. Submit sits at the bottom of the same page.
      mistake while still assembling the delivery, not correcting history.
 3. Employee clicks **Submit** at the bottom of the page → delivery
    `SUBMITTED`, its packages → `SHIPPED`.
+   - **Submit waits on unsaved work** (2026-09-05). Photos picked into the
+     upload area but never saved belong to no package, so submitting used to
+     send the delivery without them and say nothing. Submit is now disabled
+     while the upload area holds anything, and says which of the two states
+     it is waiting on: a package never saved, or a saved package reopened for
+     editing. They are different mistakes and need different instructions.
+   - **The delivery is confirmed on arrival** (2026-09-05). Submitting
+     returned to the list with no sign anything had happened. The new
+     delivery sorts to the top row, but nothing said which row it was — so a
+     toast names it (internal number first, since that is what identifies it
+     to the employee and what is written on the boxes) and its row fades from
+     green. The two run on independent clocks, the toast held long enough to
+     read and the row's wash short enough not to leave the table coloured.
 
 ### 4.2 Receiving (post-receive)
 
@@ -387,6 +400,11 @@ Filled in 2026-09-04 when implementation started, all in **TypeScript**:
 | Vitest (both sides) + supertest + React Testing Library | |
 | Postgres 16 in Docker Compose locally | Backend runs natively for now; containerizing it is a later step. |
 | `timestamptz` for datetime columns | A bare `timestamp` stores a wall-clock with no zone attached, so anything reading the DB directly (psql, a BI tool) can't tell it's UTC. Storage stays UTC; conversion to Israel time happens at display, via locale formatting rather than a hardcoded +3 — Israel is UTC+3 in summer but UTC+2 in winter. |
+
+**Code-level documentation** lives in `docs/` — `architecture.md` for module
+layout, API surface, request lifecycle, data model and seams; `user-flows.md`
+for the screens and state machines. This file stays the source of truth for
+what is being built and why.
 
 **UI prototyping note**: `ui/index.html` is a standalone Tailwind-CDN + vanilla-JS
 mockup — not the production frontend. It exists to iterate on layout/flow/RTL
@@ -648,3 +666,24 @@ changelog entries.
   Also deleted 10 package-less deliveries left over from Slice 1, before
   packages existed — nothing can create one now, and hiding them with an
   INNER JOIN would have dropped rows from the list without saying so.
+- 2026-09-05: **Deliveries list polish**, closing the gap between §4.3 as
+  built and the `ui/index.html` mockup it was drawn from: secondary text in
+  the reference and package-count cells, the mockup's row height, the row
+  chevron that marks a row as clickable (also added to the packages table,
+  §4.2), and the search field's magnifier. Alongside it, the create flow got
+  the two behaviors now recorded in §4.1 — Submit waiting on unsaved work,
+  and the confirmation that a delivery landed. Three bugs surfaced by review
+  rather than by use: a page past the end reported a row range it did not
+  have, the router's own history state was being destroyed when clearing the
+  hand-off, and a running CSS animation silently outranks `:hover`, leaving
+  the newest row the only one that ignored the pointer.
+- 2026-09-05: **Documentation split** (`docs/`). This file stays the source of
+  truth for what is being built and why; `docs/architecture.md` and
+  `docs/user-flows.md` describe how the current code is arranged — module
+  layout, API surface, request lifecycle, data model, and the three seams for
+  systems this project does not own. They are separated because they go stale
+  for different reasons: a design decision is settled once, while the shape of
+  the code changes with every slice. Keeping documentation current is now a
+  step of the `dev-workflow` skill rather than something remembered after the
+  fact — this changelog had already fallen two merges behind when the split
+  was made.
