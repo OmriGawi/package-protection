@@ -46,6 +46,11 @@ enum Phase {
 model Delivery {
   id              String         @id @default(uuid())
   internalNumber  Int            @unique @default(autoincrement())
+  // One submit attempt's key, so a retry after a timeout replays the original
+  // delivery instead of creating a second one for the same physical boxes
+  // (docs/production-readiness.md P8). Nullable: a request without the header
+  // is still accepted, and every historic row predates it.
+  idempotencyKey  String?        @unique
   direction       Direction
   referenceNumber String
   status          DeliveryStatus @default(SUBMITTED)

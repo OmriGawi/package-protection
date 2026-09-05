@@ -38,15 +38,15 @@ Four tiers, in the order they matter.
 
 | Tier | Meaning | Items |
 |---|---|---|
-| **Blocker** | Cannot serve real deliveries. Data loss, no accountability, or a state nothing can get out of. | P1–P4, P6–P11, P13 |
+| **Blocker** | Cannot serve real deliveries. Data loss, no accountability, or a state nothing can get out of. | P1–P4, P6, P7, P9–P11, P13 |
 | **Scale** | Correct on one instance with a few thousand rows; wrong beyond that. | P12, P14–P21 |
 | **Operate** | Runs, but nobody can tell when it stops running. | P24, P25 |
 | **Policy** | Not a code question. Someone in the business has to decide. | P26–P30 |
 
 Closed items keep their numbers rather than being renumbered, so a reference in
 a commit or a changelog entry stays valid: **P5, P22 and P23 were closed by the
-runtime-hardening slice (2026-09-05)**, and P24 and P25 shrank to what is left
-of them.
+runtime-hardening slice and P8 by the upload-limits slice (both 2026-09-05)**;
+P3, P6, P16, P24 and P25 shrank to what is left of them.
 
 The tiers are about *risk*, not effort. Several blockers are an afternoon each.
 
@@ -135,46 +135,43 @@ every delivery to everyone.
 
 ## 2. The photo upload path — Blocker
 
-### P6 — One request carries an entire delivery, buffered in memory
+### P6 — The bytes still go through the API, in one request
 
-**Today.** `backend/src/lib/photoUpload.ts` configures multer with
-`memoryStorage()` and limits of 15 MB per file and 200 files per request.
-`POST /api/deliveries` takes the whole delivery — every package, every photo —
-in a single multipart request, because nothing is persisted before Submit
-(DESIGN.md §3).
+**Today.** A request is capped at 150MB as a whole
+(`src/middleware/uploadSize.ts`), on top of multer's 15MB per photo and 200
+files — the three together replaced a bound of roughly 3GB held in memory
+before any validation ran. The cap reads `Content-Length`, so a chunked request
+without one still falls through to the per-file limits.
 
-**Breaks when.** Two things, independently:
+The shape underneath is unchanged: `POST /api/deliveries` takes the whole
+delivery — every package, every photo — in one multipart request, buffered in
+this process, because nothing is persisted before Submit (DESIGN.md §3).
 
-- *Memory.* The stated limits allow roughly 3 GB buffered in the process before
-  any of our validation runs, and multer buffers before the handler sees
-  anything. A handful of concurrent uploads is enough to take the process down.
-  The limits are blast-radius caps, not a design.
-- *The network.* Four photos minimum per package, taken on a personal phone
-  (DESIGN.md §4.2), over warehouse wifi. A ten-package delivery is a large
-  upload with no resume: one dropped connection and the employee re-shoots or
-  re-picks everything.
+**Breaks when.** Four photos minimum per package, taken on a personal phone
+(DESIGN.md §4.2), over warehouse wifi. A ten-package delivery is a large upload
+with no resume: one dropped connection and the employee re-shoots or re-picks
+everything. Retrying is at least safe now (P8), but it is still a full
+re-upload.
 
-**Open question.** What does the internal storage service accept (DESIGN.md §9)
-— specifically, can a browser upload to it directly with a short-lived
+**Open question.** What does the internal storage service accept (DESIGN.md
+§9) — specifically, can a browser upload to it directly with a short-lived
 credential, or must the bytes pass through our API? That single answer decides
 whether we build presigned direct upload or a resumable proxy. Also: what does
-the Tanzu ingress cap a request body at, and what is the idle timeout on a slow
+the Tanzu ingress cap a request body at, and what is its idle timeout on a slow
 upload?
 
-**Once answered.** In descending order of value, and mostly independent of the
-answer:
+**Once answered.** In descending order of value:
 
 1. Resize and compress on the client before upload. A phone photo is several
-   megabytes; evidence needs far less. This is the cheapest large win and needs
-   no backend contract — though it does need the tamper API's minimum
-   resolution first (DESIGN.md §9).
-2. Upload each photo on its own as it is taken, rather than all of them at
-   Submit, so a failure costs one photo. Submit then references already-stored
-   objects instead of carrying bytes.
+   megabytes; evidence needs far less. Cheapest large win, needs no backend
+   contract — but it does need the tamper API's minimum resolution first
+   (DESIGN.md §9).
+2. Upload each photo as it is taken rather than all of them at Submit, so a
+   failure costs one photo. Submit then references stored objects instead of
+   carrying bytes.
 3. If the storage service allows it, upload direct from the browser with a
-   short-lived credential, and take our API out of the byte path entirely.
-4. A total-bytes-per-request cap in addition to the per-file cap, whatever else
-   changes.
+   short-lived credential, and take our API out of the byte path entirely —
+   which also retires the `Content-Length` gap above.
 
 ### P7 — There is no client-side upload queue
 
@@ -192,28 +189,14 @@ coverage at all, or merely poor coverage? Is the SPA expected to be installable
 
 **Once answered.** Persist pending captures in IndexedDB with a background
 retry loop, so capture survives a reload and drains when connectivity returns.
+
+Fold in the receive path while doing it. `POST /:id/post-receive-photos` never
+got the idempotency treatment `POST /api/deliveries` did (P8): a retry after a
+committed upload gets 409 "this package is already being received", which is
+correct as a guard and a dead end for the employee holding the phone. It needs
+either the same key mechanism or a retry that recognises its own earlier upload.
 Scope depends entirely on the answer — a warehouse with real dead zones needs
 offline-first capture; poor-but-present wifi needs only retry with backoff.
-
-### P8 — Submitting a delivery is not idempotent
-
-**Today.** `POST /api/deliveries` creates a delivery on every call. There is no
-request key.
-
-**Breaks when.** The request times out at a proxy after the transaction
-committed, the employee presses Submit again, and the same physical delivery
-exists twice — with two internal numbers, both photographed, both awaiting
-receipt. On a slow upload this is not an edge case.
-
-**Open question.** None external. The mechanism is a choice: an
-`Idempotency-Key` header with a unique index, or a client-generated delivery id
-supplied on the request.
-
-**Once answered.** Whichever mechanism, the uniqueness has to be enforced by
-the database, not by a pre-check — a pre-check has the same race as the bug it
-fixes. The same treatment applies to `POST /:id/post-receive-photos`, which is
-already protected by the `claimForCheck` status guard but would duplicate
-images if the claim ever widened.
 
 ---
 

@@ -1,8 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createDelivery, type Direction, type DraftPackage } from "../api/client";
 import { DeliveryDetailsCard } from "../components/DeliveryDetailsCard";
 import { PackagesCard, type DraftState } from "../components/PackagesCard";
+import { newSubmitKey } from "../lib/submitKey";
 
 export function CreateDeliveryPage() {
   const navigate = useNavigate();
@@ -23,12 +24,22 @@ export function CreateDeliveryPage() {
   // Stable, so PackagesCard's reporting effect doesn't re-run every render.
   const handleDraftChange = useCallback((next: DraftState) => setDraftState(next), []);
 
+  // Minted once per submit *attempt* and deliberately kept across retries: a
+  // slow upload can commit on the server and still fail on the way back, and
+  // pressing שליחה again with a fresh key would file the same physical boxes
+  // twice. Cleared only on success, when there is nothing left to retry.
+  const idempotencyKey = useRef<string | null>(null);
+
   async function handleSubmit() {
     if (!canSubmit) return;
     setSubmitting(true);
     setSubmitError(null);
+    // Inside the try: anything that throws before it would skip the finally and
+    // leave the button disabled for good, with nothing on screen to explain it.
     try {
-      const created = await createDelivery(direction, referenceNumber, packages);
+      idempotencyKey.current ??= newSubmitKey();
+      const created = await createDelivery(direction, referenceNumber, packages, idempotencyKey.current);
+      idempotencyKey.current = null;
       // Handed over in history state rather than a query parameter: this is a
       // one-time confirmation, not part of the address of the list.
       navigate("/deliveries", {

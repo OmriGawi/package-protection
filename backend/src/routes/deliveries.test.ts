@@ -1,4 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
+import { randomUUID } from "crypto";
 import request from "supertest";
 import { app } from "../app";
 import { prisma } from "../lib/prisma";
@@ -10,12 +11,19 @@ const PNG = Buffer.from(
   "base64"
 );
 
-function submitDelivery(packages: { label: number; photos: number }[], overrides?: { direction?: string; reference?: string }) {
+function submitDelivery(
+  packages: { label: number; photos: number }[],
+  overrides?: { direction?: string; reference?: string; idempotencyKey?: string }
+) {
   const req = request(app)
     .post("/api/deliveries")
     .field("direction", overrides?.direction ?? "EXPORT")
     .field("reference_number", overrides?.reference ?? "SHP-31337")
     .field("packages", JSON.stringify(packages.map((p) => ({ label: p.label }))));
+
+  if (overrides?.idempotencyKey) {
+    req.set("idempotency-key", overrides.idempotencyKey);
+  }
 
   for (const pkg of packages) {
     for (let i = 0; i < pkg.photos; i++) {
@@ -23,6 +31,11 @@ function submitDelivery(packages: { label: number; photos: number }[], overrides
     }
   }
   return req;
+}
+
+/** Distinct per test: the key is unique across the whole table, and must be a UUID. */
+function freshKey() {
+  return randomUUID();
 }
 
 describe("POST /api/deliveries/validate-reference", () => {
@@ -278,5 +291,123 @@ describe("GET /api/deliveries query validation", () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/at most once/);
+  });
+});
+
+describe("POST /api/deliveries — idempotency", () => {
+  // The case this exists for: the upload is slow, a proxy times out after the
+  // transaction committed, and the employee presses Submit again. Without a key
+  // that is two deliveries for one set of physical boxes.
+  it("replays the first delivery instead of creating a second", async () => {
+    const key = freshKey();
+
+    const first = await submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: key });
+    expect(first.status).toBe(201);
+
+    const second = await submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: key });
+    expect(second.status).toBe(200);
+    expect(second.body.id).toBe(first.body.id);
+    expect(second.body.internalNumber).toBe(first.body.internalNumber);
+
+    const stored = await prisma.delivery.findMany({ where: { idempotencyKey: key } });
+    expect(stored).toHaveLength(1);
+  });
+
+  it("does not store the replay's photos a second time", async () => {
+    const key = freshKey();
+
+    const first = await submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: key });
+    await submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: key });
+
+    const images = await prisma.packageImage.findMany({
+      where: { package: { deliveryId: first.body.id } },
+    });
+    expect(images).toHaveLength(4);
+  });
+
+  // Two submits racing each other: neither lookup finds anything, and the
+  // unique constraint decides. The loser answers with the winner's delivery.
+  it("answers a concurrent duplicate with the delivery that won", async () => {
+    const key = freshKey();
+
+    const [a, b] = await Promise.all([
+      submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: key }),
+      submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: key }),
+    ]);
+
+    expect([a.status, b.status].sort()).toEqual([200, 201]);
+    expect(a.body.id).toBe(b.body.id);
+
+    const stored = await prisma.delivery.findMany({ where: { idempotencyKey: key } });
+    expect(stored).toHaveLength(1);
+  });
+
+  it("still accepts a submit with no key at all", async () => {
+    const res = await submitDelivery([{ label: 1, photos: 4 }]);
+
+    expect(res.status).toBe(201);
+    expect(res.body.idempotencyKey).toBeNull();
+  });
+
+  // Ignoring a malformed key would hand back exactly the duplicate the caller
+  // was trying to prevent.
+  // Ignoring a malformed key would hand back exactly the duplicate the caller
+  // was trying to prevent. A memorable one is refused too: the namespace is
+  // global until there is a user to scope it to, so `retry-test-1` from two
+  // callers would replay each other's deliveries.
+  it("rejects a key that is not a UUID rather than ignoring it", async () => {
+    const res = await submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: "retry-test-1" });
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/idempotency-key/);
+  });
+
+  // The key is kept across retries, so it can outlive the draft it was minted
+  // for: the submit commits, the response is lost, and the employee adds the
+  // package they forgot before sending again. Replaying would drop it silently.
+  it("refuses to replay when the request describes a different delivery", async () => {
+    const key = freshKey();
+
+    const first = await submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: key });
+    expect(first.status).toBe(201);
+
+    const changed = await submitDelivery(
+      [
+        { label: 1, photos: 4 },
+        { label: 2, photos: 4 },
+      ],
+      { idempotencyKey: key }
+    );
+
+    expect(changed.status).toBe(409);
+    expect(changed.body.delivery_id).toBe(first.body.id);
+  });
+
+  it("notices a changed reference number under the same key", async () => {
+    const key = freshKey();
+
+    await submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: key, reference: "SHP-31337" });
+    const changed = await submitDelivery([{ label: 1, photos: 4 }], {
+      idempotencyKey: key,
+      reference: "SHP-99999",
+    });
+
+    expect(changed.status).toBe(409);
+  });
+
+  it("notices more photos on the same package", async () => {
+    const key = freshKey();
+
+    await submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: key });
+    const changed = await submitDelivery([{ label: 1, photos: 5 }], { idempotencyKey: key });
+
+    expect(changed.status).toBe(409);
+  });
+
+  it("keeps two different keys as two deliveries", async () => {
+    const first = await submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: freshKey() });
+    const second = await submitDelivery([{ label: 1, photos: 4 }], { idempotencyKey: freshKey() });
+
+    expect(second.body.id).not.toBe(first.body.id);
   });
 });

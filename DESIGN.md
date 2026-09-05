@@ -785,3 +785,16 @@ changelog entries.
   priority ordering is a CASE expression and stays unindexable by construction;
   sizing any of this properly still waits on knowing real volume
   (`docs/production-readiness.md` P16–P20).
+- 2026-09-05: **Bounded uploads, and a submit that can be retried.** A delivery
+  submit now carries an `Idempotency-Key`: the SPA mints one per attempt and
+  keeps it across retries, and a repeat answers 200 with the delivery already
+  created rather than filing the same physical boxes twice. That failure was
+  not hypothetical — a slow upload can commit on the server and still fail on
+  the way back, and the only thing an employee can do is press שליחה again. Two
+  simultaneous duplicates are decided by a unique constraint rather than by a
+  read, the same pattern the manager override already used. Uploads also gained
+  a whole-request cap of 150MB, checked before anything is buffered: multer's
+  per-file and per-count limits multiplied out to roughly 3GB held in memory
+  ahead of validation. What is still open is the shape rather than the bounds —
+  the delivery goes up as one request with no resume, and fixing that waits on
+  the storage service's contract (`docs/production-readiness.md` P6, P7).
