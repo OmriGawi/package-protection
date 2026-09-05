@@ -20,6 +20,9 @@ function pkg(overrides: Partial<apiClient.Package> = {}): apiClient.Package {
     workflowStatus: "SHIPPED",
     verdict: null,
     verdictSource: null,
+    verdictOverriddenBy: null,
+    overriddenAt: null,
+    overrideNote: null,
     images: [
       { id: "i1", phase: "PRE_SHIP", sequence: 1 },
       { id: "i2", phase: "PRE_SHIP", sequence: 2 },
@@ -293,5 +296,127 @@ describe("DeliveryPackagesPage", () => {
 
     await waitFor(() => expect(screen.getByText("חבילה 1")).toBeInTheDocument());
     expect(screen.queryByText("תמונות לפני משלוח")).not.toBeInTheDocument();
+  });
+});
+
+describe("manager verdict override (DESIGN.md §4.4.5)", () => {
+  const reviewable = (overrides: Partial<apiClient.Package> = {}) =>
+    pkg({ workflowStatus: "RECEIVED", verdict: "INCONCLUSIVE", verdictSource: "API", ...overrides });
+
+  /** Opens package 1's panel and waits for the section this test cares about. */
+  async function openPanel(user: ReturnType<typeof userEvent.setup>, expected: string | RegExp) {
+    await waitFor(() => expect(screen.getByText("חבילה 1")).toBeInTheDocument());
+    await user.click(screen.getByText("חבילה 1"));
+    await waitFor(() => expect(screen.getByText(expected)).toBeInTheDocument());
+  }
+
+  it("resolves an inconclusive result in either direction", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(delivery([reviewable()]));
+    const review = vi.spyOn(apiClient, "reviewPackage").mockResolvedValue(reviewable());
+    const user = userEvent.setup();
+    renderPage();
+
+    await openPanel(user, "בדיקה ידנית");
+
+    // Both outcomes are offered: the algorithm could not decide, so a physical
+    // check has to be able to land either way.
+    expect(screen.getByRole("button", { name: "אישור כתקינה" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "אישור כנפתחה" })).toBeInTheDocument();
+
+    await user.type(screen.getByRole("textbox", { name: "הערת בדיקה" }), "נבדק במחסן");
+    await user.click(screen.getByRole("button", { name: "אישור כנפתחה" }));
+
+    await waitFor(() => expect(review).toHaveBeenCalledWith("p1", "OPENED", "נבדק במחסן"));
+  });
+
+  it("will not submit without a note", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(delivery([reviewable()]));
+    const review = vi.spyOn(apiClient, "reviewPackage");
+    const user = userEvent.setup();
+    renderPage();
+
+    await openPanel(user, "בדיקה ידנית");
+
+    // The note is the only record of what the physical check found.
+    expect(screen.getByRole("button", { name: "אישור כתקינה" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "אישור כתקינה" }));
+    expect(review).not.toHaveBeenCalled();
+
+    await user.type(screen.getByRole("textbox", { name: "הערת בדיקה" }), "   ");
+    expect(screen.getByRole("button", { name: "אישור כתקינה" })).toBeDisabled();
+  });
+
+  it("keeps the note on screen permanently once reviewed", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(
+      delivery([
+        reviewable({
+          verdict: "INTACT",
+          verdictSource: "MANUAL",
+          overrideNote: "הקרטון נבדק, אין סימני פתיחה",
+          verdictOverriddenBy: "local-dev-user",
+          overriddenAt: "2026-09-05T09:00:00.000Z",
+        }),
+      ])
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await openPanel(user, /נבדק ידנית/);
+
+    expect(screen.getByText("הקרטון נבדק, אין סימני פתיחה")).toBeInTheDocument();
+    expect(screen.getByText(/נבדק ידנית/)).toBeInTheDocument();
+    // Reviewed once and for all: the form is gone.
+    expect(screen.queryByRole("button", { name: "אישור כתקינה" })).not.toBeInTheDocument();
+  });
+
+  it("offers nothing to override on a result that is already resolved", async () => {
+    // INTACT is settled (§4.4.3) and the dashboard shows no review action for
+    // it — a form here would flip it to OPENED through a path triage never
+    // surfaces.
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(
+      delivery([reviewable({ verdict: "INTACT" })])
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("חבילה 1")).toBeInTheDocument());
+    await user.click(screen.getByText("חבילה 1"));
+
+    await waitFor(() => expect(screen.getByText("תמונות לפני משלוח")).toBeInTheDocument());
+    expect(screen.queryByText("בדיקה ידנית")).not.toBeInTheDocument();
+  });
+
+  it("re-enables the buttons when the refetch after a review fails", async () => {
+    vi.spyOn(apiClient, "getDelivery")
+      .mockResolvedValueOnce(delivery([reviewable()]))
+      .mockRejectedValue(new Error("network error"));
+    vi.spyOn(apiClient, "reviewPackage").mockResolvedValue(reviewable());
+    const user = userEvent.setup();
+    renderPage();
+
+    await openPanel(user, "בדיקה ידנית");
+    await user.type(screen.getByRole("textbox", { name: "הערת בדיקה" }), "נבדק");
+    await user.click(screen.getByRole("button", { name: "אישור כתקינה" }));
+
+    // The review succeeded; only the reload failed. Leaving the panel stuck on
+    // a disabled "שומר…" would need a full page reload to escape.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "אישור כתקינה" })).toBeEnabled()
+    );
+  });
+
+  it("offers nothing to override where there is no verdict", async () => {
+    // A failed call: retrying is what this state offers, not a review.
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(
+      delivery([pkg({ workflowStatus: "CHECK_FAILED", verdict: null })])
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("חבילה 1")).toBeInTheDocument());
+    await user.click(screen.getByText("חבילה 1"));
+
+    await waitFor(() => expect(screen.getByText("תמונות לפני משלוח")).toBeInTheDocument());
+    expect(screen.queryByText("בדיקה ידנית")).not.toBeInTheDocument();
   });
 });

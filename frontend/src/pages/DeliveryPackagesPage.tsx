@@ -7,6 +7,7 @@ import {
   type DeliveryDetail,
   type Package,
 } from "../api/client";
+import { ManagerReviewPanel } from "../components/ManagerReviewPanel";
 import { ReceivePhotosPanel } from "../components/ReceivePhotosPanel";
 import { RowChevron } from "../components/RowChevron";
 import { DIRECTION_TEXT, WORKFLOW_TEXT, formatDate, verdictInfo } from "../lib/display";
@@ -295,6 +296,13 @@ export function DeliveryPackagesPage() {
                                   טרם הועלו תמונות קבלה
                                 </div>
                               )}
+
+                              <ManagerReviewPanel
+                                pkg={pkg}
+                                onReviewed={() =>
+                                  load().catch(() => setError("טעינת המשלוח נכשלה"))
+                                }
+                              />
                             </>
                           )}
                         </td>

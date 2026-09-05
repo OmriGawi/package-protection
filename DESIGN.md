@@ -710,3 +710,29 @@ changelog entries.
   The manual override (§4.4.5) is deliberately not in this slice — it is the
   Manager writing to a verdict rather than reading one, and it lands next as
   Slice 5b.
+- 2026-09-05: **Slice 5b — the manual verdict override** (§4.4.5), the last
+  screen behavior the design specified and the code did not have. The schema
+  had carried `verdictSource`, `overrideNote`, `verdictOverriddenBy` and
+  `overriddenAt` since Slice 3 with nothing writing them. `POST
+  /api/packages/:id/review` now does, behind a required note — the only record
+  of what the physical check actually found, and it outlives everyone who
+  remembers the package. Two outcomes, never one: confirming תקינה and
+  confirming נפתחה are both available, since the whole reason `INCONCLUSIVE`
+  exists is that the algorithm could not decide. Confirming a verdict rather
+  than reversing it still ends the review — a human has been through it, so the
+  row leaves the dashboard's queue either way. A `CHECK_FAILED` package gets no
+  panel at all: there is no verdict to override, only a call to retry.
+
+  The panel sits under the photos rather than on the dashboard row, so the
+  decision is made beside the evidence it is about, and once reviewed the note
+  becomes a permanent read-only line rather than a confirmation that
+  disappears.
+- 2026-09-05: **CI and a project brief.** Both suites, typecheck and build now
+  run on every push and pull request, the backend job against a real Postgres —
+  the priority ladders and the paging are SQL, so mocking the database would
+  test nothing that ships. Build is its own gate because Vitest strips types
+  without checking them. Prompted by this session finding two tests that passed
+  locally three times and then failed roughly half the time; a pipeline catches
+  that class of thing and a person does not. Added `CLAUDE.md` as a pointer to
+  DESIGN.md, `docs/` and the two skills rather than a description that would
+  drift, and pushed the repository to a private GitHub remote.

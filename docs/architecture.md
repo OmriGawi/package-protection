@@ -63,6 +63,7 @@ imports `express`, which is what makes it directly unit-testable.
 | `GET` | `/api/deliveries/:id` | One delivery with packages and images |
 | `POST` | `/api/packages/:id/post-receive-photos` | Upload receive photos, then run the check |
 | `POST` | `/api/packages/:id/tamper-check` | Retry a check that failed |
+| `POST` | `/api/packages/:id/review` | Manager's verdict override: a required note plus INTACT or OPENED |
 | `GET` | `/api/packages` | The manager dashboard: every package flattened, priority-sorted, with operation-wide stats |
 | `GET` | `/api/images/:id` | Serve one stored photo |
 
