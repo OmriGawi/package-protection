@@ -19,6 +19,14 @@ set -uo pipefail
 
 payload=$(cat)
 
+command=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
+
+# The command itself must be a test invocation. Without this the hook fires on
+# anything whose output merely contains a Vitest summary line — cat-ing a saved
+# log, grepping one, or piping a fixture through this very script — and reports
+# numbers no run produced.
+printf '%s' "$command" | grep -qE '(^|[;&|[:space:]])(npx +)?vitest([[:space:]]|$)|(^|[;&|[:space:]])(npm|pnpm|yarn|bun)([[:space:]]+run)?[[:space:]]+test([[:space:]]|$)' || exit 0
+
 # All string values in the payload, one per line — field-name agnostic.
 flat=$(printf '%s' "$payload" | jq -r '[.. | strings] | join("\n")' 2>/dev/null) || exit 0
 
@@ -43,7 +51,6 @@ package=$(basename "${root:-unknown}")
 
 # Which scope: an explicit test path in the command means one file was run, not
 # the package's suite. Report the file rather than a file count.
-command=$(printf '%s' "$payload" | jq -r '.tool_input.command // empty' 2>/dev/null)
 targets=$(printf '%s' "$command" | grep -oE '[^ ]+\.test\.[cm]?[jt]sx?' | xargs -n1 basename 2>/dev/null | sort -u | paste -sd, -)
 
 if [ -n "$targets" ]; then
