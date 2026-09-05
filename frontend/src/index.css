@@ -169,7 +169,7 @@ table {
    pointer. !important is the only weight above the animation origin, and
    deliberately so: a deliberate hover beats a decorative fade. */
 .row-flash {
-  animation: row-flash 14s ease-out;
+  animation: row-flash 6s ease-out;
 }
 .row-flash:hover {
   background: #00000006 !important;

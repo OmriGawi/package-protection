@@ -315,7 +315,7 @@ describe("DeliveriesPage", () => {
     expect(rows[1].className).not.toContain("row-flash");
   });
 
-  it("keeps the row marked after the toast is gone", async () => {
+  it("clears the row mark on its own clock, not the toast's", async () => {
     vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row({ id: "d1" })]));
     vi.useFakeTimers();
 
@@ -328,17 +328,18 @@ describe("DeliveriesPage", () => {
       const flashedRow = () => within(screen.getByRole("table")).getAllByRole("row")[1];
       expect(flashedRow().className).toContain("row-flash");
 
-      // Toast goes at 9s; the row is the thing being pointed at, so it stays.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(9000);
+        await vi.advanceTimersByTimeAsync(5000);
       });
-      expect(screen.queryByRole("status")).not.toBeInTheDocument();
       expect(flashedRow().className).toContain("row-flash");
 
+      // The row unmarks at 6s while the toast, on 9s, is still up — the two
+      // durations are independent, which is the point of the separate state.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5100);
+        await vi.advanceTimersByTimeAsync(1100);
       });
       expect(flashedRow().className).not.toContain("row-flash");
+      expect(screen.getByRole("status")).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }
@@ -363,7 +364,7 @@ describe("DeliveriesPage", () => {
       expect(flashedRow().className).toContain("row-flash");
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(14100);
+        await vi.advanceTimersByTimeAsync(6100);
       });
       expect(flashedRow().className).not.toContain("row-flash");
     } finally {
