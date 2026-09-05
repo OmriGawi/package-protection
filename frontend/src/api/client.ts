@@ -132,6 +132,60 @@ export function listDeliveries({
   return request<DeliveryPage>(`/api/deliveries${query ? `?${query}` : ""}`);
 }
 
+/** The dashboard's filters (DESIGN.md §4.4). Not the same set as §4.3's
+ *  delivery statuses: these describe one package, not a whole delivery. */
+export type PackageFilterKey = "OPENED" | "CHECK_FAILED" | "INCONCLUSIVE" | "PENDING" | "INTACT";
+
+export interface PackageListItem {
+  packageId: string;
+  label: number;
+  workflowStatus: WorkflowStatus;
+  verdict: Verdict | null;
+  verdictSource: "API" | "MANUAL" | null;
+  needsManagerReview: boolean;
+  deliveryId: string;
+  deliveryInternalNumber: number;
+  deliveryReference: string;
+  direction: Direction;
+}
+
+export interface PackageStats {
+  total: number;
+  opened: number;
+  inconclusive: number;
+  checkFailed: number;
+  pending: number;
+}
+
+export interface PackagePage {
+  items: PackageListItem[];
+  /** Counted over every package, so the cards are unaffected by the filters
+   *  below them (DESIGN.md §4.4.1). */
+  stats: PackageStats;
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** Every package across every delivery, most urgent first (DESIGN.md §4.4). */
+export function listPackages({
+  search,
+  filter,
+  page,
+}: {
+  search?: string;
+  filter?: PackageFilterKey;
+  page?: number;
+} = {}) {
+  const params = new URLSearchParams();
+  if (search) params.set("search", search);
+  if (filter) params.set("filter", filter);
+  if (page && page > 1) params.set("page", String(page));
+
+  const query = params.toString();
+  return request<PackagePage>(`/api/packages${query ? `?${query}` : ""}`);
+}
+
 export function getDelivery(id: string) {
   return request<DeliveryDetail>(`/api/deliveries/${id}`);
 }

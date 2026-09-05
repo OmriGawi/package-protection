@@ -190,6 +190,61 @@ describe("recoverInterruptedChecks", () => {
   });
 });
 
+describe("GET /api/packages (dashboard, DESIGN.md §4.4)", () => {
+  it("returns a page of packages with the operation-wide stats beside it", async () => {
+    const response = await request(app).get("/api/packages").expect(200);
+
+    expect(response.body).toMatchObject({
+      page: 1,
+      pageSize: 20,
+      total: expect.any(Number),
+      stats: {
+        total: expect.any(Number),
+        opened: expect.any(Number),
+        inconclusive: expect.any(Number),
+        checkFailed: expect.any(Number),
+        pending: expect.any(Number),
+      },
+    });
+    expect(Array.isArray(response.body.items)).toBe(true);
+
+    // The cards describe the operation, so they cannot be smaller than a page.
+    expect(response.body.stats.total).toBeGreaterThanOrEqual(response.body.items.length);
+  });
+
+  it("carries the delivery each package belongs to, since the row links there", async () => {
+    const response = await request(app).get("/api/packages").expect(200);
+    if (response.body.items.length === 0) return;
+
+    expect(response.body.items[0]).toMatchObject({
+      packageId: expect.any(String),
+      label: expect.any(Number),
+      deliveryId: expect.any(String),
+      deliveryInternalNumber: expect.any(Number),
+      deliveryReference: expect.any(String),
+      needsManagerReview: expect.any(Boolean),
+    });
+  });
+
+  it("rejects a filter it does not have, rather than serving everything", async () => {
+    // Silently ignoring a typo'd filter looks exactly like one that matched
+    // nothing — a wrong answer that reads as a right one.
+    const response = await request(app).get("/api/packages?filter=NOPE").expect(400);
+    expect(response.body.error).toMatch(/filter must be one of/);
+  });
+
+  it("answers a repeated query parameter with 400, not 500", async () => {
+    // Express 5 hands back an array here; .trim() on it would throw.
+    await request(app).get("/api/packages?search=a&search=b").expect(400);
+    await request(app).get("/api/packages?page=1&page=2").expect(400);
+  });
+
+  it("rejects a page that is not a positive integer", async () => {
+    await request(app).get("/api/packages?page=abc").expect(400);
+    await request(app).get("/api/packages?page=0").expect(400);
+  });
+});
+
 afterAll(async () => {
   await prisma.$disconnect();
 });

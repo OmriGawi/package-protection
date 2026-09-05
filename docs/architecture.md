@@ -63,6 +63,7 @@ imports `express`, which is what makes it directly unit-testable.
 | `GET` | `/api/deliveries/:id` | One delivery with packages and images |
 | `POST` | `/api/packages/:id/post-receive-photos` | Upload receive photos, then run the check |
 | `POST` | `/api/packages/:id/tamper-check` | Retry a check that failed |
+| `GET` | `/api/packages` | The manager dashboard: every package flattened, priority-sorted, with operation-wide stats |
 | `GET` | `/api/images/:id` | Serve one stored photo |
 
 Everything is under `/api`, so the frontend's origin never encodes which
@@ -176,6 +177,18 @@ persists `SUBMITTED` and means something else entirely.
 
 Filtering, sorting and paging all run in Postgres, so a page is 20 rows however
 large the history grows. See `services/deliveryQuery.ts`.
+
+The dashboard (§4.4) derives a different thing from the same rows:
+`services/packageQuery.ts` flattens every package across every delivery and
+orders them by urgency rather than date — an unreviewed `OPENED` first, then a
+failed call, then `INCONCLUSIVE`, with anything a human has already reviewed
+sinking below packages still awaiting a verdict. "Needs review" is one SQL
+fragment used twice, by the sort and by the flag each row carries, so the rule
+cannot drift between them.
+
+Its five stat cards are counted over every package, never over the returned
+page: they are an overview of the operation, so narrowing them with the filters
+below them would make them describe the page instead.
 
 ## Local development
 

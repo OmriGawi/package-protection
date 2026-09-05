@@ -2,6 +2,7 @@ import type {
   DeliveryStatusKey,
   Direction,
   Package,
+  PackageFilterKey,
   Verdict,
   WorkflowStatus,
 } from "../api/client";
@@ -75,3 +76,28 @@ export const STATUS_FILTERS: { key: DeliveryStatusKey | "ALL"; label: string }[]
   { key: "AWAITING_RECEIPT", label: DELIVERY_STATUS_INFO.AWAITING_RECEIPT.text },
   { key: "COMPLETE", label: DELIVERY_STATUS_INFO.COMPLETE.text },
 ];
+
+/** The dashboard's chips (DESIGN.md §4.4.2). Same shape as §4.3's, deliberately
+ *  — the pattern was already validated on the employee table, so the manager
+ *  view reuses it rather than inventing a second one. These filter one package
+ *  though, not a whole delivery, so the keys differ. */
+export const PACKAGE_FILTERS: { key: PackageFilterKey | "ALL"; label: string }[] = [
+  { key: "ALL", label: "הכל" },
+  { key: "OPENED", label: VERDICT_INFO.OPENED.text },
+  { key: "CHECK_FAILED", label: "שגיאה בבדיקה" },
+  { key: "INCONCLUSIVE", label: VERDICT_INFO.INCONCLUSIVE.text },
+  { key: "PENDING", label: VERDICT_INFO.PENDING.text },
+  { key: "INTACT", label: VERDICT_INFO.INTACT.text },
+];
+
+/** Where a verdict came from (DESIGN.md §4.4). A failed call and a package with
+ *  no verdict yet have no source to show — an em dash, not a guess. */
+export function verdictSourceText(pkg: {
+  workflowStatus: WorkflowStatus;
+  verdict: Verdict | null;
+  verdictSource: "API" | "MANUAL" | null;
+}): string {
+  if (pkg.workflowStatus === "CHECK_FAILED" || pkg.verdict === null) return "—";
+  if (pkg.verdictSource === null) return "—";
+  return pkg.verdictSource === "MANUAL" ? "ידני" : "אוטומטי";
+}

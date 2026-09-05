@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { listDeliveries, type DeliveryPage, type DeliveryStatusKey } from "../api/client";
 import { Logo } from "../components/Logo";
 import { RowChevron } from "../components/RowChevron";
+import { SearchField } from "../components/SearchField";
 import { Toast } from "../components/Toast";
 import { DELIVERY_STATUS_INFO, STATUS_FILTERS, formatDate } from "../lib/display";
 
@@ -152,48 +153,11 @@ export function DeliveriesPage() {
       </div>
 
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-        <div style={{ position: "relative", width: 280, maxWidth: "100%" }}>
-          <input
-            className="field"
-            // Not type="search": Chrome and Safari draw their own clear button
-            // inside the field, which lands on top of the magnifier below.
-            type="text"
-            style={{ paddingRight: 34 }}
-            placeholder="חיפוש לפי מספר משלוח או מספר הזמנה"
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            aria-label="חיפוש משלוחים"
-            autoComplete="off"
-            data-lpignore="true"
-            data-1p-ignore="true"
-            data-bwignore="true"
-            data-form-type="other"
-          />
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="#00000055"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-            focusable="false"
-            // Without this a click on the icon — a natural target, it sits at
-            // the text-start edge — lands on the SVG and never focuses the field.
-            style={{
-              position: "absolute",
-              right: 11,
-              top: "50%",
-              transform: "translateY(-50%)",
-              pointerEvents: "none",
-            }}
-          >
-            <circle cx="11" cy="11" r="7" />
-            <path d="M21 21l-4.3-4.3" />
-          </svg>
-        </div>
+        <SearchField
+          value={searchInput}
+          onChange={setSearchInput}
+          label="חיפוש משלוחים"
+        />
 
         <div className="flex items-center gap-2 flex-wrap">
           {STATUS_FILTERS.map((filter) => {

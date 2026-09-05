@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppHeader } from "./components/AppHeader";
 import { CreateDeliveryPage } from "./pages/CreateDeliveryPage";
 import { DeliveriesPage } from "./pages/DeliveriesPage";
+import { DashboardPage } from "./pages/DashboardPage";
 import { DeliveryPackagesPage } from "./pages/DeliveryPackagesPage";
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
           <Route path="/deliveries" element={<DeliveriesPage />} />
           <Route path="/deliveries/new" element={<CreateDeliveryPage />} />
           <Route path="/deliveries/:id" element={<DeliveryPackagesPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
         </Routes>
       </main>
     </div>

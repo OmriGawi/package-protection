@@ -10,7 +10,7 @@ reasoning behind these flows lives in DESIGN.md §4; this file is the map.
 | `/deliveries` | My Deliveries — the landing page | §4.3 |
 | `/deliveries/new` | Create Delivery | §4.1 |
 | `/deliveries/:id` | Delivery packages — receive photos, verdicts | §4.2 |
-| *not built* | Inventory Manager dashboard (לוח בקרה) | §4.4 |
+| `/dashboard` | Inventory Manager dashboard (לוח בקרה) | §4.4 |
 
 ## A package's life
 
@@ -108,3 +108,24 @@ for the rest of the delivery to matter.
 
 Search, status filter, sort and paging all run in Postgres and live in the URL,
 so a filtered view survives a refresh and the back button steps through it.
+
+## The dashboard (§4.4)
+
+The mirror image of My Deliveries: that screen is one employee's deliveries,
+this one is every package across every delivery, because triage happens across
+the whole operation.
+
+```mermaid
+flowchart LR
+  A["Dashboard<br/>every package, urgent first"] -->|"click a row"| B["/deliveries/:id<br/>?package=N&from=dashboard"]
+  B --> C["That package's photo panel,<br/>already open"]
+  C -->|"Back"| A
+```
+
+The dashboard is a router to the evidence, not a second photo viewer — the row
+deep-links into the panel §4.2 already has. Both the package number and where
+the visit came from ride in the query string, so a refresh keeps the panel open
+and Back still returns to the dashboard rather than to the employee's own list.
+
+Its stat cards are fixed: they count the whole operation and ignore the search
+and filter below them.

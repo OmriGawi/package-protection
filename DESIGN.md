@@ -687,3 +687,26 @@ changelog entries.
   step of the `dev-workflow` skill rather than something remembered after the
   fact — this changelog had already fallen two merges behind when the split
   was made.
+- 2026-09-05: **Slice 5a — Inventory Manager dashboard**, the §4.4 screen the
+  mockup had and the real app did not. Every package across every delivery,
+  flattened and ordered by urgency rather than date: an unreviewed `OPENED`
+  first, then a failed call, then `INCONCLUSIVE`, with anything already
+  reviewed sinking below packages still waiting for a verdict — once a human
+  has been through it there is nothing left to do, whatever the outcome, and
+  that is what keeps "הכל" usable as the default view. The five stat cards
+  count every package and deliberately ignore the search and filter beneath
+  them, since they describe the operation rather than the page. A row
+  deep-links into that package's existing photo panel on the §4.2 page, with
+  the package number and the origin both in the query string so a refresh
+  keeps the panel open and Back returns to the dashboard.
+
+  Two things the building surfaced. `needsManagerReview` came back as SQL
+  `NULL` rather than `false` for a package with no verdict yet — `verdict IN
+  (…)` is three-valued, so the API was promising a boolean and sending null.
+  And the filters cannot all read one column: `CHECK_FAILED` is a workflow
+  state while the rest are verdicts, so a failed call is excluded from the
+  verdict filters rather than being allowed to appear under a stale one.
+
+  The manual override (§4.4.5) is deliberately not in this slice — it is the
+  Manager writing to a verdict rather than reading one, and it lands next as
+  Slice 5b.

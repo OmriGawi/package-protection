@@ -1,6 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { DeliveryPackagesPage } from "./DeliveryPackagesPage";
 import * as apiClient from "../api/client";
@@ -194,5 +194,104 @@ describe("DeliveryPackagesPage", () => {
       const cells = tableRow.querySelectorAll("td");
       expect(cells[cells.length - 1].querySelector("svg")).not.toBeNull();
     }
+  });
+
+  it("opens the package the dashboard linked to (DESIGN.md §4.4.4)", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(
+      delivery([
+        pkg({ id: "p1", label: 1, workflowStatus: "RECEIVED", verdict: "INTACT" }),
+        pkg({ id: "p2", label: 2, workflowStatus: "RECEIVED", verdict: "OPENED" }),
+      ])
+    );
+
+    render(
+      <MemoryRouter initialEntries={["/deliveries/d1?package=2&from=dashboard"]}>
+        <Routes>
+          <Route path="/deliveries/:id" element={<DeliveryPackagesPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    // Package 2's panel is open on arrival — the dashboard routes to evidence.
+    await waitFor(() => expect(screen.getByText("תמונות לפני משלוח")).toBeInTheDocument());
+    const panels = screen.getAllByText("תמונות לפני משלוח");
+    expect(panels).toHaveLength(1);
+  });
+
+  it("sends Back where the visit came from", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(delivery([pkg()]));
+
+    const { unmount } = render(
+      <MemoryRouter initialEntries={["/deliveries/d1?from=dashboard"]}>
+        <Routes>
+          <Route path="/deliveries/:id" element={<DeliveryPackagesPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByText("חזרה ללוח הבקרה")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /חזרה ללוח הבקרה/ })).toHaveAttribute("href", "/dashboard");
+    unmount();
+
+    // Without the marker it still belongs to the employee's own list.
+    renderPage();
+    await waitFor(() => expect(screen.getByText("חזרה למשלוחים")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /חזרה למשלוחים/ })).toHaveAttribute("href", "/deliveries");
+  });
+
+  it("opens the second panel when one deep link follows another", async () => {
+    // Both URLs match /deliveries/:id, so React Router keeps the same component
+    // instance across the navigation — a once-only guard leaves this closed.
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(
+      delivery([pkg({ id: "p1", label: 1 }), pkg({ id: "p2", label: 2 })])
+    );
+
+    function Jump() {
+      const navigate = useNavigate();
+      return (
+        <button type="button" onClick={() => navigate("/deliveries/d7?package=2")}>
+          jump
+        </button>
+      );
+    }
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/deliveries/d1?package=1"]}>
+        <Jump />
+        <Routes>
+          <Route path="/deliveries/:id" element={<DeliveryPackagesPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    // The panel row is the sibling of the row it belongs to, which is how this
+    // asserts *which* package is open rather than that something is.
+    const openPanelFollows = (label: string) => {
+      const rows = within(screen.getByRole("table")).getAllByRole("row");
+      const index = rows.findIndex((tableRow) => within(tableRow).queryByText(label));
+      return index >= 0 && Boolean(rows[index + 1] && within(rows[index + 1]).queryByText("תמונות לפני משלוח"));
+    };
+
+    await waitFor(() => expect(openPanelFollows("חבילה 1")).toBe(true));
+
+    await user.click(screen.getByRole("button", { name: "jump" }));
+
+    await waitFor(() => expect(openPanelFollows("חבילה 2")).toBe(true));
+  });
+
+  it("ignores a package number the delivery does not have", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(delivery([pkg({ label: 1 })]));
+
+    render(
+      <MemoryRouter initialEntries={["/deliveries/d1?package=99"]}>
+        <Routes>
+          <Route path="/deliveries/:id" element={<DeliveryPackagesPage />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByText("חבילה 1")).toBeInTheDocument());
+    expect(screen.queryByText("תמונות לפני משלוח")).not.toBeInTheDocument();
   });
 });
