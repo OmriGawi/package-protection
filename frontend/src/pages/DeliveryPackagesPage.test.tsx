@@ -178,4 +178,21 @@ describe("DeliveryPackagesPage", () => {
     expect(screen.getByText("טרם הועלו תמונות קבלה")).toBeInTheDocument();
     expect(within(screen.getByRole("table")).getAllByRole("img")).toHaveLength(2);
   });
+
+  it("marks every package row as clickable with a trailing chevron", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(
+      delivery([pkg(), pkg({ id: "p2", label: 2, workflowStatus: "RECEIVED", verdict: "INTACT" })])
+    );
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("חבילה 1")).toBeInTheDocument());
+    const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(2);
+    for (const tableRow of rows) {
+      // Last cell, after the action cell that holds the receive/retry button.
+      const cells = tableRow.querySelectorAll("td");
+      expect(cells[cells.length - 1].querySelector("svg")).not.toBeNull();
+    }
+  });
 });

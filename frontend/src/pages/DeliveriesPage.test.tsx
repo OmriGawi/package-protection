@@ -55,7 +55,7 @@ describe("DeliveriesPage", () => {
     renderPage();
 
     await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
-    await user.type(screen.getByRole("searchbox", { name: "חיפוש משלוחים" }), "SHP-84");
+    await user.type(screen.getByRole("textbox", { name: "חיפוש משלוחים" }), "SHP-84");
 
     await waitFor(() =>
       expect(list).toHaveBeenLastCalledWith(expect.objectContaining({ search: "SHP-84" }))
@@ -140,7 +140,7 @@ describe("DeliveriesPage", () => {
     await waitFor(() =>
       expect(list).toHaveBeenCalledWith({ search: "SHP-9", status: "OPENED", page: 3 })
     );
-    expect(screen.getByRole("searchbox", { name: "חיפוש משלוחים" })).toHaveValue("SHP-9");
+    expect(screen.getByRole("textbox", { name: "חיפוש משלוחים" })).toHaveValue("SHP-9");
   });
 
   it("opens a delivery when its row is clicked", async () => {
@@ -194,7 +194,7 @@ describe("DeliveriesPage", () => {
     renderPage();
     await waitFor(() => expect(list).toHaveBeenCalled());
 
-    await user.type(screen.getByRole("searchbox", { name: "חיפוש משלוחים" }), "SHP");
+    await user.type(screen.getByRole("textbox", { name: "חיפוש משלוחים" }), "SHP");
     await user.click(screen.getByRole("button", { name: "הושלם" }));
 
     // The debounced commit must not overwrite the chip with pre-click params.
@@ -217,5 +217,67 @@ describe("DeliveriesPage", () => {
 
     await waitFor(() => expect(list).toHaveBeenCalledWith(expect.objectContaining({ page: 1 })));
     expect(screen.getByText(/עמוד 1 מתוך/)).toBeInTheDocument();
+  });
+
+  it("marks every row as clickable with a trailing chevron", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(
+      page([row({ id: "a", referenceNumber: "SHP-1" }), row({ id: "b", referenceNumber: "SHP-2" })])
+    );
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("SHP-1")).toBeInTheDocument());
+    const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+    expect(rows).toHaveLength(2);
+    for (const tableRow of rows) {
+      const lastCell = tableRow.querySelectorAll("td")[5];
+      expect(lastCell.querySelector("svg")).not.toBeNull();
+    }
+  });
+
+  it("puts a magnifier in the search field", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row()]));
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("SHP-84213")).toBeInTheDocument());
+    const field = screen.getByRole("textbox", { name: "חיפוש משלוחים" });
+    expect(field.parentElement?.querySelector("svg")).not.toBeNull();
+  });
+
+  it("reports which slice of the total is on screen", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row()], { total: 239, page: 2 }));
+
+    render(
+      <MemoryRouter initialEntries={["/deliveries?page=2"]}>
+        <DeliveriesPage />
+      </MemoryRouter>
+    );
+
+    // Second page, one row returned: 21 through 21, not 21 through 40.
+    await waitFor(() => expect(screen.getByText("מציג 21–21 מתוך 239")).toBeInTheDocument());
+  });
+
+  it("does not invent a row range for a page that has no rows", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([], { total: 239, page: 99 }));
+
+    render(
+      <MemoryRouter initialEntries={["/deliveries?page=99"]}>
+        <DeliveriesPage />
+      </MemoryRouter>
+    );
+
+    // offset is 1960 here, so an unguarded end would read "מציג 0–1960 מתוך 239".
+    await waitFor(() => expect(screen.getByText("0 מתוך 239")).toBeInTheDocument());
+    expect(screen.queryByText(/1960/)).not.toBeInTheDocument();
+  });
+
+  it("drops the pager when there is nothing at all to page through", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([], { total: 0 }));
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText(/עדיין לא נוצרו משלוחים/)).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "הבא" })).not.toBeInTheDocument();
   });
 });
