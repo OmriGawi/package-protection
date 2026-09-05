@@ -754,3 +754,20 @@ changelog entries.
   behind it. Deliberately a separate file rather than more of §9 — §9 asks
   third parties for contracts, this asks our own platform team and business for
   decisions, and the two get answered by different people at different times.
+- 2026-09-05: **Runtime hardening.** The backend now validates its whole
+  environment at boot and refuses to start on a bad one, answers `/api/health`
+  and `/api/ready` separately, drains on SIGTERM — waiting for in-flight tamper
+  checks, which outlive their own response and so are invisible to a socket
+  drain — and answers errors through its own handler rather than Express's,
+  which had been putting stack traces in response bodies and turning an
+  oversized photo into a 500. Logs are one JSON object per line with a request
+  id threaded through async context, ready for Splunk to collect later; helmet
+  sets security headers; CORS takes an explicit origin list in production.
+  Rate limits guard the two upload endpoints and the retry button, keyed by
+  address until there is a user to key on — deliberately loose, since a
+  warehouse behind one NAT is a single key, and with photos and probes outside
+  the global backstop because a delivery page polls every second and loads eight
+  thumbnails at once. Most of this closes items catalogued the same day in
+  `docs/production-readiness.md` (P5, P22, P23, and part of P3, P24 and P25);
+  the one thing deliberately left out is the actor seam, whose shape depends on
+  which Keycloak claim carries identity.

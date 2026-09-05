@@ -1,4 +1,5 @@
 import type { WorkflowStatus } from "@prisma/client";
+import { log } from "../lib/logger";
 import { prisma } from "../lib/prisma";
 import { getTamperCheckClient, type TamperCheckClient } from "../lib/tamperCheck";
 
@@ -42,6 +43,29 @@ export async function releaseClaim(packageId: string, to: WorkflowStatus): Promi
  * an async function flattens a returned promise, so awaiting it would wait for
  * the whole check and undo the point of this design.)
  */
+// A check outlives the request that started it, so nothing else in the process
+// knows it is running: the response is already sent and its socket is closed.
+// Shutdown needs that count, or it would drain "cleanly" while killing the only
+// work the grace period exists for.
+const inFlight = new Set<Promise<void>>();
+
+export function inFlightCheckCount(): number {
+  return inFlight.size;
+}
+
+/** Waits for running checks, up to `timeoutMs`. Answers whether they all finished. */
+export async function awaitInFlightChecks(timeoutMs: number): Promise<boolean> {
+  if (inFlight.size === 0) return true;
+
+  const timedOut = Symbol("timed-out");
+  const timer = new Promise<typeof timedOut>((resolve) =>
+    setTimeout(() => resolve(timedOut), timeoutMs).unref()
+  );
+
+  const result = await Promise.race([Promise.allSettled([...inFlight]), timer]);
+  return result !== timedOut;
+}
+
 export async function startCheck(
   packageId: string,
   client: TamperCheckClient = getTamperCheckClient()
@@ -51,9 +75,13 @@ export async function startCheck(
   // Left running: the request returns 202 and the client polls for the result.
   // runCheck records its own failures, so this catch is only for the unexpected
   // — it must never surface as an unhandled rejection.
-  void runCheck(packageId, check.id, client).catch((error) =>
-    console.error(`tamper check for package ${packageId} failed unexpectedly`, error)
-  );
+  const running = runCheck(packageId, check.id, client)
+    .catch((error) =>
+      log.error("tamper_check_unexpected_failure", { packageId, checkId: check.id, err: error })
+    )
+    .finally(() => inFlight.delete(running));
+
+  inFlight.add(running);
 }
 
 async function runCheck(packageId: string, checkId: string, client: TamperCheckClient): Promise<void> {

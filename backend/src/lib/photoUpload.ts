@@ -4,8 +4,8 @@ import { ALLOWED_IMAGE_TYPES_LABEL, detectImageType, extensionForImageType } fro
 
 export const MIN_PHOTOS_PER_PACKAGE = 4;
 
-const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
-const MAX_PHOTOS_PER_REQUEST = 200;
+export const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
+export const MAX_PHOTOS_PER_REQUEST = 200;
 
 // Bounded because memoryStorage buffers every part in RAM before any of our
 // own validation runs — without limits one oversized POST can take the process

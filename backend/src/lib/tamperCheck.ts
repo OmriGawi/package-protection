@@ -1,4 +1,5 @@
 import type { Verdict } from "@prisma/client";
+import { log } from "./logger";
 
 /**
  * One image as handed to the tamper-detection service.
@@ -89,9 +90,10 @@ export function forcedOutcome(): MockOutcome | null {
   // working, which is worse than the typo.
   if (!warnedAboutInvalidOutcome) {
     warnedAboutInvalidOutcome = true;
-    console.warn(
-      `Ignoring TAMPER_CHECK_OUTCOME="${process.env.TAMPER_CHECK_OUTCOME}" — expected one of ${MOCK_OUTCOMES.join(", ")}, or RANDOM. Falling back to random.`
-    );
+    log.warn("tamper_check_outcome_invalid", {
+      configured: process.env.TAMPER_CHECK_OUTCOME,
+      expected: [...MOCK_OUTCOMES, "RANDOM"],
+    });
   }
   return null;
 }

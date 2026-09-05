@@ -1,0 +1,104 @@
+import { describe, expect, it } from "vitest";
+import { ConfigError, loadConfig } from "./config";
+
+const VALID: NodeJS.ProcessEnv = {
+  DATABASE_URL: "postgresql://user:pass@localhost:5432/db",
+};
+
+describe("loadConfig", () => {
+  it("applies the defaults the existing setup relies on", () => {
+    const config = loadConfig(VALID);
+
+    expect(config).toMatchObject({
+      nodeEnv: "development",
+      isProduction: false,
+      port: 4000,
+      corsOrigins: [],
+      shutdownGraceMs: 10_000,
+      jsonBodyLimit: "100kb",
+    });
+  });
+
+  it("rejects a missing DATABASE_URL", () => {
+    expect(() => loadConfig({})).toThrow(ConfigError);
+  });
+
+  // One restart per mistake is the slow way to find out an environment is
+  // wrong in three places.
+  it("reports every problem at once, not just the first", () => {
+    let problems: string[] = [];
+    try {
+      loadConfig({ NODE_ENV: "staging", PORT: "http", SHUTDOWN_GRACE_MS: "-1" });
+    } catch (error) {
+      problems = (error as ConfigError).problems;
+    }
+
+    expect(problems).toHaveLength(4);
+    expect(problems.join("\n")).toContain("DATABASE_URL");
+    expect(problems.join("\n")).toContain("NODE_ENV");
+    expect(problems.join("\n")).toContain("PORT");
+    expect(problems.join("\n")).toContain("SHUTDOWN_GRACE_MS");
+  });
+
+  it("requires an explicit CORS origin in production only", () => {
+    expect(() => loadConfig({ ...VALID, NODE_ENV: "production" })).toThrow(/CORS_ORIGIN/);
+    expect(loadConfig({ ...VALID, NODE_ENV: "development" }).corsOrigins).toEqual([]);
+  });
+
+  // Left unset behind an ingress, req.ip is the ingress's own address and the
+  // whole deployment shares one rate-limit bucket.
+  it("requires TRUST_PROXY in production only", () => {
+    expect(() => loadConfig({ ...VALID, NODE_ENV: "production", CORS_ORIGIN: "https://x.example" }))
+      .toThrow(/TRUST_PROXY/);
+    expect(loadConfig(VALID).trustProxy).toBe(false);
+  });
+
+  it("reads TRUST_PROXY as a hop count or a boolean", () => {
+    expect(loadConfig({ ...VALID, TRUST_PROXY: "1" }).trustProxy).toBe(1);
+    expect(loadConfig({ ...VALID, TRUST_PROXY: "true" }).trustProxy).toBe(true);
+    expect(loadConfig({ ...VALID, TRUST_PROXY: "false" }).trustProxy).toBe(false);
+    expect(() => loadConfig({ ...VALID, TRUST_PROXY: "sometimes" })).toThrow(/TRUST_PROXY/);
+  });
+
+  // body-parser reads an unparseable limit as *no* limit, so a typo would
+  // quietly remove the cap instead of failing.
+  it("rejects a body limit body-parser would silently ignore", () => {
+    expect(loadConfig({ ...VALID, JSON_BODY_LIMIT: "2mb" }).jsonBodyLimit).toBe("2mb");
+    expect(() => loadConfig({ ...VALID, JSON_BODY_LIMIT: "100k" })).toThrow(/JSON_BODY_LIMIT/);
+    expect(() => loadConfig({ ...VALID, JSON_BODY_LIMIT: "1_000_000" })).toThrow(/JSON_BODY_LIMIT/);
+  });
+
+  it("splits a comma-separated CORS_ORIGIN and drops the blanks", () => {
+    const config = loadConfig({
+      ...VALID,
+      CORS_ORIGIN: "https://packages.example.com, https://admin.example.com , ",
+    });
+
+    expect(config.corsOrigins).toEqual([
+      "https://packages.example.com",
+      "https://admin.example.com",
+    ]);
+  });
+
+  // The suite runs from one address and uploads dozens of times, so an
+  // enabled limiter would read as flakiness rather than protection.
+  it("defaults rate limiting off under test and on elsewhere", () => {
+    expect(loadConfig({ ...VALID, NODE_ENV: "test" }).rateLimitEnabled).toBe(false);
+    expect(
+      loadConfig({
+        ...VALID,
+        NODE_ENV: "production",
+        CORS_ORIGIN: "https://x.example",
+        TRUST_PROXY: "1",
+      }).rateLimitEnabled
+    ).toBe(true);
+    expect(loadConfig({ ...VALID, NODE_ENV: "test", RATE_LIMIT_ENABLED: "true" })
+      .rateLimitEnabled).toBe(true);
+  });
+
+  it("rejects a boolean that isn't one", () => {
+    expect(() => loadConfig({ ...VALID, RATE_LIMIT_ENABLED: "yes please" })).toThrow(
+      /RATE_LIMIT_ENABLED/
+    );
+  });
+});

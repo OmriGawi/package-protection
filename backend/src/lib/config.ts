@@ -1,0 +1,172 @@
+import "dotenv/config";
+
+/**
+ * The one module that reads `process.env`.
+ *
+ * It loads `.env` itself rather than relying on `index.ts` doing it first:
+ * tests import `app` directly and never run `index.ts`, and Prisma quietly
+ * loads `.env` on its own, so before this module the answer to "is the
+ * environment loaded?" depended on which import happened to come first.
+ *
+ * Validation runs once, at import, and reports *every* problem rather than the
+ * first — a misconfigured environment is usually misconfigured in more than
+ * one way, and finding that out one restart at a time is the slow version.
+ */
+
+export type NodeEnv = "development" | "test" | "production";
+
+export interface Config {
+  nodeEnv: NodeEnv;
+  isProduction: boolean;
+  port: number;
+  databaseUrl: string;
+  storageDir: string | undefined;
+  /** Allowed browser origins. Empty means "any", which only development gets. */
+  corsOrigins: string[];
+  /** Express's `trust proxy`: false, true, or a hop count. */
+  trustProxy: boolean | number;
+  rateLimitEnabled: boolean;
+  /** How long a shutdown waits for in-flight requests before forcing exit. */
+  shutdownGraceMs: number;
+  /** Largest JSON body accepted. Uploads are multipart and bounded separately. */
+  jsonBodyLimit: string;
+}
+
+export class ConfigError extends Error {
+  constructor(readonly problems: string[]) {
+    super(`Invalid environment:\n  - ${problems.join("\n  - ")}`);
+    this.name = "ConfigError";
+  }
+}
+
+function parseNodeEnv(raw: string | undefined, problems: string[]): NodeEnv {
+  const value = raw?.trim() || "development";
+  if (value === "development" || value === "test" || value === "production") {
+    return value;
+  }
+  problems.push(`NODE_ENV must be development, test or production (got "${raw}")`);
+  return "development";
+}
+
+function parseInteger(
+  name: string,
+  raw: string | undefined,
+  fallback: number,
+  problems: string[]
+): number {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const value = Number(raw);
+  if (!Number.isInteger(value) || value < 0) {
+    problems.push(`${name} must be a non-negative integer (got "${raw}")`);
+    return fallback;
+  }
+  return value;
+}
+
+function parseBoolean(
+  name: string,
+  raw: string | undefined,
+  fallback: boolean,
+  problems: string[]
+): boolean {
+  if (raw === undefined || raw.trim() === "") return fallback;
+  const value = raw.trim().toLowerCase();
+  if (value === "true" || value === "1") return true;
+  if (value === "false" || value === "0") return false;
+  problems.push(`${name} must be true or false (got "${raw}")`);
+  return fallback;
+}
+
+/**
+ * `TRUST_PROXY` decides where `req.ip` comes from, which decides what the rate
+ * limiter counts. Left at Express's default (false), every request behind an
+ * ingress reports the ingress's own address, so the whole deployment shares one
+ * bucket and one busy client throttles everybody. Required in production for
+ * that reason; a hop count is the safe form, since `true` trusts an
+ * `X-Forwarded-For` a client can write itself.
+ */
+function parseTrustProxy(
+  raw: string | undefined,
+  isProduction: boolean,
+  problems: string[]
+): boolean | number {
+  const value = raw?.trim().toLowerCase();
+
+  if (!value) {
+    if (isProduction) {
+      problems.push(
+        "TRUST_PROXY is required in production (the number of proxies in front of this process, or false if none)"
+      );
+    }
+    return false;
+  }
+
+  if (value === "false") return false;
+  if (value === "true") return true;
+
+  const hops = Number(value);
+  if (Number.isInteger(hops) && hops >= 0) return hops;
+
+  problems.push(`TRUST_PROXY must be true, false or a hop count (got "${raw}")`);
+  return false;
+}
+
+/**
+ * body-parser runs its limit through `bytes.parse`, which answers null for
+ * anything outside its grammar — and a null limit means *no* limit. A typo
+ * would silently remove the cap rather than fail, so the grammar is checked
+ * here instead.
+ */
+function parseByteLimit(raw: string | undefined, fallback: string, problems: string[]): string {
+  const value = raw?.trim();
+  if (!value) return fallback;
+
+  if (!/^\d+(\.\d+)?\s*(b|kb|mb|gb)$/i.test(value)) {
+    problems.push(`JSON_BODY_LIMIT must be a byte size such as 100kb (got "${raw}")`);
+    return fallback;
+  }
+  return value;
+}
+
+export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+  const problems: string[] = [];
+
+  const nodeEnv = parseNodeEnv(env.NODE_ENV, problems);
+  const isProduction = nodeEnv === "production";
+
+  const databaseUrl = env.DATABASE_URL?.trim();
+  if (!databaseUrl) {
+    problems.push("DATABASE_URL is required");
+  }
+
+  const corsOrigins = (env.CORS_ORIGIN ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+  // Wildcard CORS is a development convenience. In production the browser
+  // origin is known, and a wildcard would also stop working the moment auth
+  // uses cookies (DESIGN.md §6).
+  if (isProduction && corsOrigins.length === 0) {
+    problems.push("CORS_ORIGIN is required in production (comma-separated origins)");
+  }
+
+  const config: Config = {
+    nodeEnv,
+    isProduction,
+    port: parseInteger("PORT", env.PORT, 4000, problems),
+    databaseUrl: databaseUrl ?? "",
+    storageDir: env.STORAGE_DIR?.trim() || undefined,
+    corsOrigins,
+    trustProxy: parseTrustProxy(env.TRUST_PROXY, isProduction, problems),
+    // Off in tests: the suite runs from one address and uploads dozens of
+    // times, so a limit would turn into flakiness rather than protection.
+    rateLimitEnabled: parseBoolean("RATE_LIMIT_ENABLED", env.RATE_LIMIT_ENABLED, nodeEnv !== "test", problems),
+    shutdownGraceMs: parseInteger("SHUTDOWN_GRACE_MS", env.SHUTDOWN_GRACE_MS, 10_000, problems),
+    jsonBodyLimit: parseByteLimit(env.JSON_BODY_LIMIT, "100kb", problems),
+  };
+
+  if (problems.length > 0) throw new ConfigError(problems);
+  return config;
+}
+
+export const config = loadConfig();
