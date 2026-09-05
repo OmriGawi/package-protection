@@ -4,6 +4,7 @@
 |---|---|
 | [architecture.md](architecture.md) | Where the code lives, how a request flows, the data model, the seams |
 | [user-flows.md](user-flows.md) | The screens, a package's life, the shipping and receiving flows |
+| [production-readiness.md](production-readiness.md) | What is still missing before this runs on the company network, and the question that decides each gap |
 | [../DESIGN.md](../DESIGN.md) | The product design doc — requirements, decisions, open questions, changelog |
 
 **DESIGN.md is the source of truth.** It holds *what* is being built and *why*,
