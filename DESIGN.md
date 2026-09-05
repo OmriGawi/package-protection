@@ -414,6 +414,11 @@ screen's design is settled here.
 
 ## 9. Open Questions
 
+Questions about the *third parties* live here. Questions about running the
+application for real — auth, the upload path, the background job, storage,
+indexes, deployment, retention — live in `docs/production-readiness.md`, one
+numbered item each, and reference this section rather than repeating it.
+
 ### Third-party tamper-detection API (to raise with whoever owns/provides it)
 - Input format: raw image files, URLs, or base64? Any size/resolution/format
   constraints (JPEG/PNG, max MB)?
@@ -736,3 +741,16 @@ changelog entries.
   that class of thing and a person does not. Added `CLAUDE.md` as a pointer to
   DESIGN.md, `docs/` and the two skills rather than a description that would
   drift, and pushed the repository to a private GitHub remote.
+- 2026-09-05: **Production-readiness audit.** Wrote
+  `docs/production-readiness.md`: 30 numbered gaps between what runs today and
+  what survives the company network, each with what the code does now, the
+  condition that turns it into an incident, the open question that decides the
+  fix, and the work that follows once it is answered. Blockers are the ones
+  with no user behind them — every row is attributed to `local-dev-user`, no
+  route checks a role, the tamper-check mock can ship, and the startup recovery
+  that is correct on one instance silently marks a second instance's in-flight
+  checks as failed. The upload path is the other theme: one multipart request
+  per delivery, buffered in memory, not idempotent, with no client-side queue
+  behind it. Deliberately a separate file rather than more of §9 — §9 asks
+  third parties for contracts, this asks our own platform team and business for
+  decisions, and the two get answered by different people at different times.
