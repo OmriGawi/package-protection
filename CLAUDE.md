@@ -37,6 +37,9 @@ cd frontend && npm test && npm run typecheck
 Both, every time. Vitest strips types without checking them, so a green suite
 can sit on a broken build — that has happened here.
 
+`npm run coverage` in either package prints a report. CI prints it too, on
+every run. It is reported, not enforced: no threshold gates a merge.
+
 The backend suite needs Postgres: `docker compose up -d`. Test files run in
 parallel against that one database, so a test that compares two separate reads
 of a global count is flaky by construction; scope assertions to the rows the

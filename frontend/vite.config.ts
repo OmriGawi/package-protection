@@ -9,5 +9,18 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/test/setup.ts',
+    coverage: {
+      provider: 'v8',
+      // Everything that ships, so a component with no test at all shows up as a
+      // zero rather than vanishing from the denominator.
+      include: ['src/**'],
+      exclude: [
+        'src/**/*.test.*',
+        'src/test/**',
+        // Mount point: renders <App/> into the DOM and nothing else.
+        'src/main.tsx',
+      ],
+      reporter: ['text', 'text-summary'],
+    },
   },
 })
