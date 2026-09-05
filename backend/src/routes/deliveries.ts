@@ -11,6 +11,7 @@ import {
   upload,
 } from "../lib/photoUpload";
 import { CURRENT_USER } from "../lib/currentUser";
+import { uploadLimiter } from "../middleware/rateLimit";
 import { validateReference, type Direction } from "../services/erpMock";
 import {
   DELIVERY_STATUSES,
@@ -57,7 +58,7 @@ deliveriesRouter.post("/validate-reference", async (req, res) => {
 // A delivery and all of its packages arrive together in one multipart request:
 // nothing is persisted before Submit (DESIGN.md §3), so the photos are still
 // in-session File objects on the client until this call.
-deliveriesRouter.post("/", upload.any(), async (req, res) => {
+deliveriesRouter.post("/", uploadLimiter, upload.any(), async (req, res) => {
   const input = parseDeliveryInput(req, res);
   if (!input) return;
 

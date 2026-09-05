@@ -38,7 +38,8 @@ backend/
   src/index.ts             Process entry — listens, reads env
   src/routes/              HTTP layer: parse, validate, respond
   src/services/            Business logic, no Express types
-  src/lib/                 Seams and shared helpers
+  src/middleware/          Cross-cutting Express: request id, errors, limits
+  src/lib/                 Seams, config, logging, shared helpers
 frontend/
   src/App.tsx              Routes
   src/api/client.ts        The only module that knows the API's shape
@@ -53,6 +54,12 @@ The `routes → services → lib` split is the one structural rule on the backen
 routes own HTTP, services own decisions, lib owns the seams. A service never
 imports `express`, which is what makes it directly unit-testable.
 
+`middleware/` is the fourth directory and holds what is none of those three:
+behavior that applies across requests rather than to one endpoint — the request
+id, the error handler, the 404, the rate limiters. It exists so `app.ts` stays a
+list of what is mounted in what order, which is the only place that order is
+visible.
+
 ## API surface
 
 | Method | Path | Purpose |
@@ -66,6 +73,8 @@ imports `express`, which is what makes it directly unit-testable.
 | `POST` | `/api/packages/:id/review` | Manager's verdict override: a required note plus INTACT or OPENED |
 | `GET` | `/api/packages` | The manager dashboard: every package flattened, priority-sorted, with operation-wide stats |
 | `GET` | `/api/images/:id` | Serve one stored photo |
+| `GET` | `/api/health` | Liveness: the process is up. Touches nothing else |
+| `GET` | `/api/ready` | Readiness: the database answers and the process is not draining |
 
 Everything is under `/api`, so the frontend's origin never encodes which
 service answers (DESIGN.md §8).
@@ -199,9 +208,18 @@ cd backend  && npm run dev    # API on :4000
 cd frontend && npm run dev    # SPA on :5173
 ```
 
-`backend/.env` needs `DATABASE_URL` and `PORT`; `TAMPER_CHECK_OUTCOME` pins the
+`backend/.env` needs `DATABASE_URL`; everything else has a development default.
+`backend/.env.example` lists them all. `TAMPER_CHECK_OUTCOME` pins the
 stand-in's verdict for a demo (`INTACT`, `OPENED`, `INCONCLUSIVE`,
 `CALL_FAILED`, or `RANDOM`).
+
+`src/lib/config.ts` is the only module that reads `process.env`. It validates at
+import and reports every problem at once, so a misconfigured environment fails
+at startup rather than at the first request that needed the missing piece. In
+production it is stricter: `CORS_ORIGIN` becomes required, and `src/index.ts`
+refuses to start at all if the tamper-detection client is still the mock or
+`TAMPER_CHECK_OUTCOME` is set — a mocked verdict is indistinguishable from a
+real one after the fact, since `verdictSource` says `API` either way.
 
 Both packages run `npm test` and `npm run typecheck`. Run both — Vitest strips
 types without checking them, so a green suite can sit on a broken build.

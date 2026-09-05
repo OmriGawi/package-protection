@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
+import { config } from "./config";
 
 // Production doesn't mount the NAS — it calls an internal storage service
 // whose contract is still unknown (DESIGN.md §7, §9). Everything above this
@@ -47,5 +48,5 @@ export class LocalDiskStorage implements StorageClient {
 }
 
 export const storage: StorageClient = new LocalDiskStorage(
-  path.resolve(process.env.STORAGE_DIR ?? path.join(__dirname, "../../storage"))
+  path.resolve(config.storageDir ?? path.join(__dirname, "../../storage"))
 );

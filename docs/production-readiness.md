@@ -38,10 +38,15 @@ Four tiers, in the order they matter.
 
 | Tier | Meaning | Items |
 |---|---|---|
-| **Blocker** | Cannot serve real deliveries. Data loss, no accountability, or a state nothing can get out of. | P1–P11, P13 |
+| **Blocker** | Cannot serve real deliveries. Data loss, no accountability, or a state nothing can get out of. | P1–P4, P6–P11, P13 |
 | **Scale** | Correct on one instance with a few thousand rows; wrong beyond that. | P12, P14–P21 |
-| **Operate** | Runs, but nobody can tell when it stops running. | P22–P25 |
+| **Operate** | Runs, but nobody can tell when it stops running. | P24, P25 |
 | **Policy** | Not a code question. Someone in the business has to decide. | P26–P30 |
+
+Closed items keep their numbers rather than being renumbered, so a reference in
+a commit or a changelog entry stays valid: **P5, P22 and P23 were closed by the
+runtime-hardening slice (2026-09-05)**, and P24 and P25 shrank to what is left
+of them.
 
 The tiers are about *risk*, not effort. Several blockers are an afternoon each.
 
@@ -93,22 +98,20 @@ role turns out to be scoped rather than global, authorization becomes per
 resource — check the delivery's site against the actor's — which is a different
 and larger change, so this question is worth asking early.
 
-### P3 — CORS is wide open
+### P3 — The allowed CORS origins are not known yet
 
-**Today.** `backend/src/app.ts` calls bare `cors()`, which answers every origin
-with `Access-Control-Allow-Origin: *`.
+**Today.** `CORS_ORIGIN` is a comma-separated list read by `src/lib/config.ts`,
+required in production and empty (meaning any origin) in development. The
+mechanism is in place; the values are not.
 
-**Breaks when.** Any page on the network can call the API with the browser's
-ambient context. It also stops working the moment auth uses cookies, because a
-wildcard origin and credentials are mutually exclusive.
+**Breaks when.** Nothing, until deployment — at which point the process refuses
+to start rather than serving a wildcard, which is the intended failure.
 
-**Open question.** What origin(s) does the SPA actually serve from per
-environment — one hostname per environment, or a shared one? Is the SPA served
-by the same host as the API behind the ingress, in which case cross-origin
-config narrows to development only?
+**Open question.** What origin does the SPA serve from in each environment, and
+is it served from the same host as the API behind the ingress? If it is,
+cross-origin configuration narrows to development only.
 
-**Once answered.** Pin the allowed origin from configuration, one value per
-environment, and fail startup if it is unset outside development.
+**Once answered.** Set the value per environment. Nothing in the code changes.
 
 ### P4 — Images are addressable by anyone who has an id
 
@@ -127,24 +130,6 @@ see everything — confirm.
 **Once answered.** Authorize the read against the package's delivery, and
 extend the same rule to the list and detail endpoints, which currently return
 every delivery to everyone.
-
-### P5 — The mock tamper client can ship to production
-
-**Today.** `backend/src/lib/tamperCheck.ts` holds a mutable module-level
-`activeClient` defaulting to `MockTamperCheckClient`, and
-`TAMPER_CHECK_OUTCOME` pins its verdict, read fresh on every call.
-
-**Breaks when.** A production deploy inherits the default, or an environment
-carries `TAMPER_CHECK_OUTCOME` forward from a demo. Every package then gets a
-fabricated verdict that looks exactly like a real one — `verdictSource` says
-`API` either way.
-
-**Open question.** None outside our control. This is ours to fix, and it is
-listed here because the cost of getting it wrong is silent and total.
-
-**Once answered.** Fail startup in production if no real client is configured
-or if `TAMPER_CHECK_OUTCOME` is set. Consider recording the client identity on
-the `TamperCheck` row so a mocked verdict is distinguishable after the fact.
 
 ---
 
@@ -241,9 +226,11 @@ a `PENDING` row and deliberately does not await the call: the request returns
 202 and the client polls. The work lives in the Node process.
 
 **Breaks when.** Any restart — a deploy, a crash, a Tanzu rescheduling — during
-a check. `recoverInterruptedChecks()` handles this by moving stranded packages
-to `CHECK_FAILED` so the existing retry button reaches them, which is a sound
-answer for one process.
+a check. A `SIGTERM` is now handled: the drain waits for in-flight checks before
+exiting (`src/index.ts`), so an orderly deploy no longer strands them. A crash
+or a `SIGKILL` still does, and `recoverInterruptedChecks()` remains the answer
+for that — it moves stranded packages to `CHECK_FAILED` so the existing retry
+button reaches them, which is sound for one process.
 
 **Open question.** How many instances does Tanzu run, and is that number under
 our control? Is there a Redis or a message broker already available on the
@@ -484,77 +471,53 @@ references rather than bytes in a database column.
 
 ## 6. Runtime and operations — Operate
 
-### P22 — No health or readiness endpoint
+### P24 — Nothing collects the logs, and nothing watches the numbers
 
-**Today.** `app.ts` mounts three routers and nothing else. The platform has no
-way to ask whether this instance is serving.
+**Today.** The backend emits one JSON object per line on stdout, with a request
+id on every line and an `x-request-id` echoed to the caller
+(`src/middleware/requestId.ts`). Nothing collects those lines, and no metric is
+derived from them.
 
-**Breaks when.** Tanzu routes traffic to an instance whose database connection
-is dead, or restarts a healthy instance because it cannot tell.
+**Breaks when.** An incident. The lines exist but live only in whatever
+`kubectl logs` still holds, and nobody is told that anything is wrong in the
+first place.
 
-**Open question.** What does the platform probe, on what path, and with what
-timing and failure threshold? Does it distinguish liveness from readiness?
+**Open question.** Splunk is the destination (answered 2026-09-05, §10). Does
+it ingest container stdout directly on this platform, or does it want a
+forwarder or a specific field naming? Is there a metrics system and an alerting
+path alongside it?
 
-**Once answered.** A liveness endpoint that only proves the process is up, and a
-separate readiness endpoint that checks the database. Keep them distinct — a
-liveness probe that fails on a database blip restarts a process that would have
-recovered.
+**Once answered.** Match the field names the aggregator expects, then define
+what is watched: upload latency and failure rate, check duration, verdict
+distribution, queue depth, and the `CHECK_FAILED` rate. That last alert needs
+its wording chosen carefully — a spike there means the vendor is down, not that
+packages are being tampered with.
 
-### P23 — No graceful shutdown
+### P25 — Rate limits are keyed by address, and counted per instance
 
-**Today.** `index.ts` calls `app.listen` and nothing handles `SIGTERM`.
+**Today.** `express-rate-limit` guards the two upload endpoints and the retry
+endpoint, with a loose global backstop; `src/middleware/rateLimit.ts` holds the
+key function. Photos and the health probes sit outside the global limiter on
+purpose, since a delivery page polls every second and loads eight thumbnails at
+a time. `TRUST_PROXY` decides what `req.ip` resolves to and is required in
+production.
 
-**Breaks when.** Every deploy. In-flight requests are cut, and in-flight tamper
-checks are lost (P9/P10).
+**Breaks when.** Two ways, both structural rather than sloppy:
 
-**Open question.** What termination grace period does the platform allow before
-`SIGKILL`?
+- There is no authenticated user, so the key is an address. A warehouse behind
+  one NAT puts every employee in one bucket — which is why the limits are
+  currently loose enough to be a backstop rather than a policy.
+- The counters live in the process, so the effective limit is multiplied by the
+  instance count.
 
-**Once answered.** On `SIGTERM`: stop accepting new connections, let in-flight
-requests finish within the grace period, close the Prisma client, exit. Once
-checks are on a queue, the worker stops claiming new jobs and finishes or
-releases what it holds.
+**Open question.** What is the platform's own ingress capable of — does it rate
+limit already, making this redundant? Is a shared counter store (Redis)
+available? And how are secrets delivered, since the same startup validation
+should assert them (P22's config work covers the shape, not the source).
 
-### P24 — Logging is `console`, and there is no error handler
-
-**Today.** `console.log` and `console.error` with plain strings. Express's
-default error handler serves anything thrown from a route.
-
-**Breaks when.** An incident. Nothing correlates a user's report to a request,
-nothing aggregates errors, and the default handler's response body depends on
-`NODE_ENV` being set correctly — which nothing here verifies.
-
-**Open question.** What does the company platform already collect — a log
-aggregator with an expected JSON shape, an error tracker, a metrics system? We
-should emit what the existing tooling reads rather than invent a format.
-
-**Once answered.** Structured JSON logging with a request id, actor id and
-package id on every line, plus an explicit Express error handler that logs the
-full error and returns a generic message with a correlation id. Never log photo
-bytes, and treat the override note as user content, not diagnostics. Worth
-watching: upload latency and failure rate, check duration, verdict
-distribution, queue depth, and the `CHECK_FAILED` rate — a spike there means the
-vendor is down, not that packages are being tampered with, and the alert should
-say so.
-
-### P25 — Configuration is unvalidated and unhardened
-
-**Today.** `dotenv` loads whatever is present. `PORT` falls back to 4000,
-`STORAGE_DIR` falls back to a path next to the source. A missing
-`DATABASE_URL` surfaces as a Prisma error at first query. There is no `helmet`,
-and no rate limiting anywhere.
-
-**Breaks when.** A misconfigured environment starts successfully and fails
-later, in production, on the first request that touches the missing piece.
-
-**Open question.** How are secrets delivered on the platform — environment
-variables from a config store, mounted files, a vault? What is available for
-rate limiting at the ingress, so we do not duplicate it in the application?
-
-**Once answered.** Validate the whole environment at boot and refuse to start on
-anything missing or invalid, with the production assertions from P5 in the same
-check. Add `helmet`, and rate-limit the upload and retry endpoints specifically
-— unless the ingress already does it.
+**Once answered.** Re-key on the Keycloak subject once P1 lands, tighten the
+limits accordingly, and move the counters to a shared store or delete them in
+favour of the ingress.
 
 ---
 
@@ -657,4 +620,5 @@ implementing slice delete it from this file.
 
 | Date | Item(s) | Question | Answer | Source |
 |---|---|---|---|---|
-| | | | | |
+| 2026-09-05 | P24 | Where do logs go? | Splunk, wired up later. It reads container stdout, so the application's job is only to emit indexable lines — which it now does. | Project owner |
+| 2026-09-05 | P25 | Rate limit before there is a user to key on? | Yes, keyed by address and deliberately loose, re-keyed to the Keycloak subject when auth lands. | Project owner |
