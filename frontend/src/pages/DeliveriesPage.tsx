@@ -346,8 +346,11 @@ export function DeliveriesPage() {
 
       {created && (
         <Toast
-          title={`משלוח ${created.referenceNumber} נוצר בהצלחה`}
-          detail={`${created.packageCount} חבילות · מס' משלוח #${created.internalNumber}`}
+          // The internal number leads: it is what identifies the delivery to
+          // the employee, and it is what is written on the boxes. The ERP
+          // reference is context, so it drops to the second line.
+          title={`משלוח #${created.internalNumber} נוצר בהצלחה`}
+          detail={`${created.packageCount} חבילות · ${created.referenceNumber}`}
           onDismiss={() => setCreated(null)}
         />
       )}

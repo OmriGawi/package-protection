@@ -304,9 +304,10 @@ describe("DeliveriesPage", () => {
     renderAfterCreate();
 
     const toast = await screen.findByRole("status");
-    expect(within(toast).getByText("משלוח SHP-4471 נוצר בהצלחה")).toBeInTheDocument();
+    // The internal number leads; the ERP reference sits on the detail line.
+    expect(within(toast).getByText("משלוח #353 נוצר בהצלחה")).toBeInTheDocument();
     expect(within(toast).getByText(/2 חבילות/)).toBeInTheDocument();
-    expect(within(toast).getByText(/#353/)).toBeInTheDocument();
+    expect(within(toast).getByText(/SHP-4471/)).toBeInTheDocument();
 
     // Only the delivery that was just created is washed in.
     const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
