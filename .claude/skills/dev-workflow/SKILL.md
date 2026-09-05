@@ -40,12 +40,22 @@ risky.
    whole slice here.
 
 5. **Code review.** Run the `code-review` skill on the diff before
-   considering the work finished or offering to merge. Fix what it finds,
-   or say explicitly why not.
+   considering the work finished or offering to merge.
 
-   `code-review` is the skill that actually reads the diff; `caveman-review`
-   only governs how a finding is worded (one line: location, problem, fix).
-   Use both — they compose, they are not alternatives.
+   `code-review` reads the diff and returns prose; it runs in a subagent, so
+   the session's caveman mode does not reach it. Relaying its report is the
+   step that applies `caveman-review` — one line per finding:
+
+   ```
+   <path>:L<line> — <🔴 bug|🟡 risk|🔵 nit> <problem>. <fix>. [confirmed|rejected: <why>]
+   ```
+
+   Check each finding against the code before acting on it, and say which way
+   it went. Reviewers are wrong sometimes — two findings were rejected on
+   2026-09-05, one of them contradicting an earlier review — so a report
+   relayed without a verdict per line hides the part that took the work.
+
+   Fix what survives, or say explicitly why not.
 
 6. **Update the docs.** Ask which of the three is affected before calling the
    work done — most changes touch one, some touch none, but the question gets
