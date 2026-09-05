@@ -132,4 +132,51 @@ describe("CreateDeliveryPage", () => {
     expect(screen.getByText(/"packageCount":2/)).toBeInTheDocument();
     expect(screen.getByText(/"internalNumber":353/)).toBeInTheDocument();
   });
+
+  it("refuses to send while photos sit unsaved, rather than dropping them", async () => {
+    const createSpy = vi.spyOn(apiClient, "createDelivery");
+    const user = userEvent.setup();
+    renderPage();
+
+    await validateReferenceNumber(user);
+    await addPackage(user);
+    expect(submitButton()).toBeEnabled();
+
+    // A second package photographed but never saved — the exact case that used
+    // to submit one package and bin the other four photos.
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(
+      input,
+      Array.from({ length: 4 }, (_, i) => new File(["x"], `second-${i}.png`, { type: "image/png" }))
+    );
+
+    expect(await screen.findByText(/יש חבילה שטרם נשמרה/)).toBeInTheDocument();
+    expect(submitButton()).toBeDisabled();
+    await user.click(submitButton());
+    expect(createSpy).not.toHaveBeenCalled();
+
+    // Saving it clears the block and the package goes with the delivery.
+    await user.click(screen.getByRole("button", { name: "שמירת חבילה והוספת הבאה" }));
+    await waitFor(() => expect(screen.queryByText(/יש חבילה שטרם נשמרה/)).not.toBeInTheDocument());
+    expect(submitButton()).toBeEnabled();
+  });
+
+  it("tells an editing employee to finish the edit, not to save a new package", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await validateReferenceNumber(user);
+    await addPackage(user);
+    expect(submitButton()).toBeEnabled();
+
+    // Reopening a saved package loads its photos into the same upload area.
+    await user.click(screen.getByText("חבילה 1"));
+
+    expect(await screen.findByText(/חבילה נמצאת בעריכה/)).toBeInTheDocument();
+    expect(screen.queryByText(/יש חבילה שטרם נשמרה/)).not.toBeInTheDocument();
+    expect(submitButton()).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "ביטול עריכה" }));
+    await waitFor(() => expect(submitButton()).toBeEnabled());
+  });
 });

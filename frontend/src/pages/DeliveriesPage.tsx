@@ -8,6 +8,10 @@ import { DELIVERY_STATUS_INFO, STATUS_FILTERS, formatDate } from "../lib/display
 
 const SEARCH_DEBOUNCE_MS = 300;
 
+// Outlives the toast on purpose: the row is the thing being pointed at, so it
+// stays marked for a while after the message goes.
+const ROW_FLASH_MS = 8000;
+
 /** Handed over by CreateDeliveryPage through history state. */
 export type CreatedDelivery = {
   id: string;
@@ -37,6 +41,11 @@ export function DeliveriesPage() {
   const location = useLocation();
   const [created, setCreated] = useState<CreatedDelivery | null>(
     (location.state as { created?: CreatedDelivery } | null)?.created ?? null
+  );
+  // Tracked apart from `created` so dismissing the toast — by hand or on its
+  // own timer — does not cut the row's fade short.
+  const [flashId, setFlashId] = useState<string | null>(
+    (location.state as { created?: CreatedDelivery } | null)?.created?.id ?? null
   );
   // Cleared through the router, never with window.history.replaceState: React
   // Router keeps its own { usr, key, idx } in history state, and overwriting
@@ -94,6 +103,16 @@ export function DeliveriesPage() {
     }
     setParams(next);
   }
+
+  // Timed from when the row is on screen, not from mount: the list is still
+  // being fetched at mount, so a slow response would spend the fade's lifetime
+  // on an empty table and the row would arrive already unmarked.
+  const flashOnScreen = Boolean(flashId && result?.items.some((item) => item.id === flashId));
+  useEffect(() => {
+    if (!flashOnScreen) return;
+    const timer = setTimeout(() => setFlashId(null), ROW_FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [flashOnScreen]);
 
   const pageCount = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
   const isFiltered = Boolean(search || status);
@@ -247,7 +266,7 @@ export function DeliveriesPage() {
                       <tr
                         key={delivery.id}
                         className={
-                          delivery.id === created?.id
+                          delivery.id === flashId
                             ? "row-hover cursor-pointer row-flash"
                             : "row-hover cursor-pointer"
                         }

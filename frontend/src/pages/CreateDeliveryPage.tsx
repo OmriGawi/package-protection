@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createDelivery, type Direction, type DraftPackage } from "../api/client";
 import { DeliveryDetailsCard } from "../components/DeliveryDetailsCard";
-import { PackagesCard } from "../components/PackagesCard";
+import { PackagesCard, type DraftState } from "../components/PackagesCard";
 
 export function CreateDeliveryPage() {
   const navigate = useNavigate();
@@ -12,8 +12,16 @@ export function CreateDeliveryPage() {
   const [packages, setPackages] = useState<DraftPackage[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [draftState, setDraftState] = useState<DraftState>("none");
 
-  const canSubmit = referenceValid && packages.length > 0 && !submitting;
+  // Work in the upload area is not part of `packages`, so sending now would
+  // drop it without a word. Both cases block, but they are different mistakes
+  // and get different instructions: an unsaved package needs saving, a package
+  // being edited needs the edit finished or abandoned.
+  const canSubmit = referenceValid && packages.length > 0 && !submitting && draftState === "none";
+
+  // Stable, so PackagesCard's reporting effect doesn't re-run every render.
+  const handleDraftChange = useCallback((next: DraftState) => setDraftState(next), []);
 
   async function handleSubmit() {
     if (!canSubmit) return;
@@ -68,12 +76,29 @@ export function CreateDeliveryPage() {
         />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          <PackagesCard enabled={referenceValid} packages={packages} onChange={setPackages} />
+          <PackagesCard
+            enabled={referenceValid}
+            packages={packages}
+            onChange={setPackages}
+            onDraftChange={handleDraftChange}
+          />
 
           <div className="flex flex-col items-end gap-2">
             <button type="button" className="btn-primary" disabled={!canSubmit} onClick={handleSubmit}>
               {submitting ? "שולח…" : "שליחת המשלוח"}
             </button>
+            {draftState !== "none" && (
+              <p className="text-[12px] flex items-center gap-1.5" style={{ color: "var(--amber)" }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 9v4" />
+                  <path d="M12 17h.01" />
+                  <path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z" />
+                </svg>
+                {draftState === "editing"
+                  ? "חבילה נמצאת בעריכה — שמרו את השינויים או בטלו את העריכה."
+                  : "יש חבילה שטרם נשמרה — שמרו אותה או הסירו את התמונות."}
+              </p>
+            )}
             {submitError && (
               <p className="text-[12px]" style={{ color: "var(--red)" }}>
                 {submitError}

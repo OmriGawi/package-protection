@@ -1,22 +1,38 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { DraftPackage } from "../api/client";
 import { nextPackageLabel } from "../lib/packageLabels";
 import { usePhotoDraft } from "../lib/usePhotoDraft";
 import { PhotoDraftThumbs, PhotoDropzone } from "./PhotoPicker";
 
+export type DraftState = "none" | "new" | "editing";
+
 export function PackagesCard({
   enabled,
   packages,
   onChange,
+  onDraftChange,
 }: {
   enabled: boolean;
   packages: DraftPackage[];
   onChange: (packages: DraftPackage[]) => void;
+  /** What is sitting in the upload area: "new" for photos belonging to no
+   *  package yet, "editing" for a saved package reopened for changes, "none"
+   *  when it is empty. The submit button needs this — without it, pressing
+   *  Send drops unsaved work in silence. */
+  onDraftChange?: (state: DraftState) => void;
 }) {
   const draft = usePhotoDraft();
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const editingPackage = packages.find((p) => p.id === editingId) ?? null;
+
+  // Editing loads a saved package's photos into this same draft area, so a
+  // non-empty draft does not on its own mean something is unsaved.
+  const draftState: DraftState =
+    draft.photos.length === 0 ? "none" : editingId ? "editing" : "new";
+  useEffect(() => {
+    onDraftChange?.(draftState);
+  }, [draftState, onDraftChange]);
   const currentLabel = editingPackage ? editingPackage.label : nextPackageLabel(packages);
   const canSavePackage = enabled && draft.hasEnough;
 

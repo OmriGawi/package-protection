@@ -314,6 +314,62 @@ describe("DeliveriesPage", () => {
     expect(rows[1].className).not.toContain("row-flash");
   });
 
+  it("keeps the row marked after the toast is gone", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row({ id: "d1" })]));
+    vi.useFakeTimers();
+
+    try {
+      renderAfterCreate();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      const flashedRow = () => within(screen.getByRole("table")).getAllByRole("row")[1];
+      expect(flashedRow().className).toContain("row-flash");
+
+      // Toast goes at 5s; the row is the thing being pointed at, so it stays.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+      expect(flashedRow().className).toContain("row-flash");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3100);
+      });
+      expect(flashedRow().className).not.toContain("row-flash");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("starts the row fade when the row appears, not when the page mounts", async () => {
+    // A response slower than the fade itself: timed from mount, the row would
+    // arrive already unmarked.
+    vi.spyOn(apiClient, "listDeliveries").mockImplementation(
+      () => new Promise((resolve) => setTimeout(() => resolve(page([row({ id: "d1" })])), 9000))
+    );
+    vi.useFakeTimers();
+
+    try {
+      renderAfterCreate();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(9100);
+      });
+
+      const flashedRow = () => within(screen.getByRole("table")).getAllByRole("row")[1];
+      expect(flashedRow().className).toContain("row-flash");
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(8100);
+      });
+      expect(flashedRow().className).not.toContain("row-flash");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("says nothing when the list is opened normally", async () => {
     vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row()]));
 

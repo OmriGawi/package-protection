@@ -162,12 +162,17 @@ table {
     background: transparent;
   }
 }
-/* No `forwards`: a retained end value is an animation-priority declaration,
-   which outranks .row-hover:hover and would leave the row unable to show a
-   hover highlight for as long as the class is on it. The base background is
-   transparent anyway, so there is nothing to retain. */
+/* No `forwards`, so nothing is retained once the fade ends — the base
+   background is transparent anyway.
+   A running animation still outranks .row-hover:hover for those 8 seconds,
+   which would leave the new row as the one row that does not respond to the
+   pointer. !important is the only weight above the animation origin, and
+   deliberately so: a deliberate hover beats a decorative fade. */
 .row-flash {
-  animation: row-flash 3s ease-out;
+  animation: row-flash 8s ease-out;
+}
+.row-flash:hover {
+  background: #00000006 !important;
 }
 .toast {
   animation: toast-in 0.18s ease-out;
