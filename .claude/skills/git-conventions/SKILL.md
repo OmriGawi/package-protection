@@ -21,8 +21,9 @@ are deliberately not repeated here.
 ## Branch flow (GitHub flow)
 
 - `main` is always deployable. No `develop`/`release`/`hotfix` branches.
-- One short-lived branch per unit of work: `feat/<slice-or-feature>` or
-  `fix/<bug>` — e.g. `feat/slice-1-create-delivery`.
+- One short-lived branch per unit of work: `feat/<slice-or-feature>`,
+  `fix/<bug>`, `docs/<topic>` or `chore/<task>` — e.g.
+  `feat/slice-1-create-delivery`, `docs/architecture-and-flows`.
 - A branch is mergeable once it has been through the full `dev-workflow`
   loop. Merging to `main` is a separate, explicit checkpoint — confirm
   with the user, never as the silent last step of a slice.

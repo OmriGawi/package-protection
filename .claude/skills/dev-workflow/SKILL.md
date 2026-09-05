@@ -1,6 +1,6 @@
 ---
 name: dev-workflow
-description: Use before writing any non-trivial code in this repo — a new slice, a feature, a bug fix touching real logic. Enforces the five-step loop this project always follows — plan, implement, write tests, run tests, code review — in order, every time, before calling work done or offering to merge. Skip only for genuinely trivial one-line changes.
+description: Use before writing any non-trivial code in this repo — a new slice, a feature, a bug fix touching real logic. Enforces the six-step loop this project always follows — plan, implement, write tests, run tests, code review, update docs — in order, every time, before calling work done or offering to merge. Skip only for genuinely trivial one-line changes.
 ---
 
 # Dev workflow
@@ -47,7 +47,20 @@ risky.
    only governs how a finding is worded (one line: location, problem, fix).
    Use both — they compose, they are not alternatives.
 
-Only after all five steps does a slice count as done. Merging
+6. **Update the docs.** Ask which of the three is affected before calling the
+   work done — most changes touch one, some touch none, but the question gets
+   asked every time:
+   - `DESIGN.md` — behavior the user can see, a decision made, a constraint
+     found. Its §11 changelog gets an entry per merged unit of work, written
+     for someone reading it in a year with none of this session's context.
+   - `docs/architecture.md` — a new route, a moved module, a schema change, a
+     new seam.
+   - `docs/user-flows.md` — a screen doing something different.
+
+   The changelog fell two merges behind before this step existed. It is
+   cheapest to write while the reasoning is still in hand.
+
+Only after all six steps does a slice count as done. Merging
 `feat/*` → `main` is a separate, explicit checkpoint per the git-flow
 already in use for this repo — this skill governs getting a branch to a
 mergeable state, not the merge itself.
