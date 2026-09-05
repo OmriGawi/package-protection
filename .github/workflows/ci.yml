@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push to the same branch makes the first run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+
+    # The suite talks to a real Postgres rather than a mock: the priority
+    # ladders and the paging are SQL, so mocking the database would test
+    # nothing that ships.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: package_protector
+          POSTGRES_PASSWORD: package_protector
+          POSTGRES_DB: package_protector
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U package_protector"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://package_protector:package_protector@localhost:5432/package_protector
+      PORT: 4000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+        working-directory: backend
+
+      # Schema first: the suite runs against real tables.
+      - run: npx prisma migrate deploy
+        working-directory: backend
+
+      - run: npm run typecheck
+        working-directory: backend
+
+      # Typecheck and tests both run even if the first fails — one report of
+      # everything wrong beats finding the next problem on the next push.
+      - if: '!cancelled()'
+        run: npm test
+        working-directory: backend
+
+      # Vitest strips types without checking them, so a green suite can sit on
+      # a broken build. That has happened here; the build is its own gate.
+      - if: '!cancelled()'
+        run: npm run build
+        working-directory: backend
+
+  frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+        working-directory: frontend
+
+      - run: npm run typecheck
+        working-directory: frontend
+
+      - if: '!cancelled()'
+        run: npm test
+        working-directory: frontend
+
+      - if: '!cancelled()'
+        run: npm run lint
+        working-directory: frontend
+
+      - if: '!cancelled()'
+        run: npm run build
+        working-directory: frontend
