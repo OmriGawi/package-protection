@@ -17,3 +17,7 @@ backend/storage/
 .claude/skills/*
 !.claude/skills/dev-workflow
 !.claude/skills/git-conventions
+
+# Coverage output
+coverage/
+coverage.log

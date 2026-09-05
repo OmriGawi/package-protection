@@ -67,6 +67,20 @@ jobs:
         run: npm run build
         working-directory: backend
 
+      # Reported, not enforced. A threshold set at today's number mostly fires
+      # on noise; the point is that the trend is visible on every run.
+      - name: Coverage
+        if: '!cancelled()'
+        run: |
+          npm run coverage 2>&1 | tee coverage.log
+          {
+            echo "### Backend coverage"
+            echo '```'
+            sed -n '/Coverage summary/,/^=*$/p' coverage.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        working-directory: backend
+
   frontend:
     runs-on: ubuntu-latest
 
@@ -95,4 +109,16 @@ jobs:
 
       - if: '!cancelled()'
         run: npm run build
+        working-directory: frontend
+
+      - name: Coverage
+        if: '!cancelled()'
+        run: |
+          npm run coverage 2>&1 | tee coverage.log
+          {
+            echo "### Frontend coverage"
+            echo '```'
+            sed -n '/Coverage summary/,/^=*$/p' coverage.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
         working-directory: frontend
