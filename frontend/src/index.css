@@ -150,3 +150,44 @@ table {
   cursor: pointer;
   padding: 0;
 }
+
+/* Confirmation that a just-created delivery is the row you are looking at.
+   The wash decays to nothing so the row ends up styled like every other one —
+   nothing here outlives the animation. */
+@keyframes row-flash {
+  from {
+    background: var(--green-soft);
+  }
+  to {
+    background: transparent;
+  }
+}
+/* No `forwards`: a retained end value is an animation-priority declaration,
+   which outranks .row-hover:hover and would leave the row unable to show a
+   hover highlight for as long as the class is on it. The base background is
+   transparent anyway, so there is nothing to retain. */
+.row-flash {
+  animation: row-flash 3s ease-out;
+}
+.toast {
+  animation: toast-in 0.18s ease-out;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Motion is decoration here — the toast text and the row itself carry the
+   information, so both are safe to show statically. */
+@media (prefers-reduced-motion: reduce) {
+  .row-flash,
+  .toast {
+    animation: none;
+  }
+}

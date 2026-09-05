@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -279,5 +279,112 @@ describe("DeliveriesPage", () => {
 
     await waitFor(() => expect(screen.getByText(/עדיין לא נוצרו משלוחים/)).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "הבא" })).not.toBeInTheDocument();
+  });
+
+  const createdHandoff = {
+    id: "d1",
+    internalNumber: 353,
+    referenceNumber: "SHP-4471",
+    packageCount: 2,
+  };
+
+  function renderAfterCreate() {
+    return render(
+      <MemoryRouter initialEntries={[{ pathname: "/deliveries", state: { created: createdHandoff } }]}>
+        <DeliveriesPage />
+      </MemoryRouter>
+    );
+  }
+
+  it("confirms a delivery that was just created, and points at its row", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(
+      page([row({ id: "d1", referenceNumber: "SHP-4471" }), row({ id: "d2", referenceNumber: "SHP-31337" })])
+    );
+
+    renderAfterCreate();
+
+    const toast = await screen.findByRole("status");
+    expect(within(toast).getByText("משלוח SHP-4471 נוצר בהצלחה")).toBeInTheDocument();
+    expect(within(toast).getByText(/2 חבילות/)).toBeInTheDocument();
+    expect(within(toast).getByText(/#353/)).toBeInTheDocument();
+
+    // Only the delivery that was just created is washed in.
+    const rows = within(screen.getByRole("table")).getAllByRole("row").slice(1);
+    expect(rows[0].className).toContain("row-flash");
+    expect(rows[1].className).not.toContain("row-flash");
+  });
+
+  it("says nothing when the list is opened normally", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row()]));
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("SHP-84213")).toBeInTheDocument());
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("table")).getAllByRole("row")[1].className).not.toContain("row-flash");
+  });
+
+  it("lets the confirmation be dismissed by hand", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row({ id: "d1" })]));
+    const user = userEvent.setup();
+
+    renderAfterCreate();
+
+    await screen.findByRole("status");
+    await user.click(screen.getByRole("button", { name: "סגירת ההודעה" }));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("keeps counting down across re-renders instead of restarting the clock", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row({ id: "d1" })]));
+    vi.useFakeTimers();
+
+    try {
+      const view = renderAfterCreate();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByRole("status")).toBeInTheDocument();
+
+      // Anything that re-renders the page — a keystroke in the search box, a
+      // resolved fetch — hands the toast a fresh onDismiss identity.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(3000);
+      });
+      view.rerender(
+        <MemoryRouter initialEntries={[{ pathname: "/deliveries", state: { created: createdHandoff } }]}>
+          <DeliveriesPage />
+        </MemoryRouter>
+      );
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(2100);
+      });
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("takes the confirmation away on its own after five seconds", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row({ id: "d1" })]));
+    vi.useFakeTimers();
+
+    try {
+      renderAfterCreate();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+      expect(screen.getByRole("status")).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5000);
+      });
+      expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

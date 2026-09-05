@@ -20,8 +20,19 @@ export function CreateDeliveryPage() {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await createDelivery(direction, referenceNumber, packages);
-      navigate("/deliveries");
+      const created = await createDelivery(direction, referenceNumber, packages);
+      // Handed over in history state rather than a query parameter: this is a
+      // one-time confirmation, not part of the address of the list.
+      navigate("/deliveries", {
+        state: {
+          created: {
+            id: created.id,
+            internalNumber: created.internalNumber,
+            referenceNumber: created.referenceNumber,
+            packageCount: created.packages.length,
+          },
+        },
+      });
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "השליחה נכשלה, נסו שוב");
     } finally {

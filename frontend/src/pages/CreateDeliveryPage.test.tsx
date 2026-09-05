@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateDeliveryPage } from "./CreateDeliveryPage";
 import * as apiClient from "../api/client";
@@ -89,5 +89,47 @@ describe("CreateDeliveryPage", () => {
     await user.click(submitButton());
 
     await waitFor(() => expect(screen.getByText("package 1 needs at least 4 photos")).toBeInTheDocument());
+  });
+
+  it("hands the new delivery to the list so it can be pointed out there", async () => {
+    vi.spyOn(apiClient, "createDelivery").mockResolvedValue({
+      id: "d9",
+      internalNumber: 353,
+      direction: "EXPORT",
+      referenceNumber: "SHP-84213",
+      status: "SUBMITTED",
+      createdBy: "local-dev-user",
+      createdAt: new Date().toISOString(),
+      packages: [
+        { id: "p1", label: 1, workflowStatus: "SHIPPED", verdict: null, verdictSource: null, images: [] },
+        { id: "p2", label: 2, workflowStatus: "SHIPPED", verdict: null, verdictSource: null, images: [] },
+      ],
+    });
+
+    function StateProbe() {
+      const location = useLocation();
+      return <pre>{JSON.stringify(location.state)}</pre>;
+    }
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/deliveries/new"]}>
+        <Routes>
+          <Route path="/deliveries/new" element={<CreateDeliveryPage />} />
+          <Route path="/deliveries" element={<StateProbe />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await validateReferenceNumber(user);
+    await addPackage(user);
+    await user.click(submitButton());
+
+    await waitFor(() =>
+      expect(screen.getByText(/"id":"d9"/)).toBeInTheDocument()
+    );
+    // The count comes from what the server actually persisted, not the draft.
+    expect(screen.getByText(/"packageCount":2/)).toBeInTheDocument();
+    expect(screen.getByText(/"internalNumber":353/)).toBeInTheDocument();
   });
 });

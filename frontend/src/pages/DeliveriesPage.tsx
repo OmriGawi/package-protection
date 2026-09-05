@@ -1,11 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { listDeliveries, type DeliveryPage, type DeliveryStatusKey } from "../api/client";
 import { Logo } from "../components/Logo";
 import { RowChevron } from "../components/RowChevron";
+import { Toast } from "../components/Toast";
 import { DELIVERY_STATUS_INFO, STATUS_FILTERS, formatDate } from "../lib/display";
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+/** Handed over by CreateDeliveryPage through history state. */
+export type CreatedDelivery = {
+  id: string;
+  internalNumber: number;
+  referenceNumber: string;
+  packageCount: number;
+};
 
 export function DeliveriesPage() {
   const navigate = useNavigate();
@@ -22,6 +31,22 @@ export function DeliveriesPage() {
   const [searchInput, setSearchInput] = useState(search);
   const [result, setResult] = useState<DeliveryPage | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Read once into state, then wiped from history: a refresh or a Back onto
+  // this entry must not re-announce a delivery created minutes ago.
+  const location = useLocation();
+  const [created, setCreated] = useState<CreatedDelivery | null>(
+    (location.state as { created?: CreatedDelivery } | null)?.created ?? null
+  );
+  // Cleared through the router, never with window.history.replaceState: React
+  // Router keeps its own { usr, key, idx } in history state, and overwriting
+  // that with {} leaves idx undefined — truthy enough to defeat the library's
+  // `|| { idx: null }` fallback, after which pop tracking is broken for the
+  // rest of the session.
+  useEffect(() => {
+    if (!(location.state as { created?: CreatedDelivery } | null)?.created) return;
+    navigate(location.pathname + location.search, { replace: true, state: null });
+  }, [location.state, location.pathname, location.search, navigate]);
 
   // The input is what the user types; the URL is what gets queried. Debounced
   // so a fetch doesn't fire per keystroke.
@@ -221,7 +246,11 @@ export function DeliveriesPage() {
                     return (
                       <tr
                         key={delivery.id}
-                        className="row-hover cursor-pointer"
+                        className={
+                          delivery.id === created?.id
+                            ? "row-hover cursor-pointer row-flash"
+                            : "row-hover cursor-pointer"
+                        }
                         style={{ borderTop: "1px solid var(--border)" }}
                         onClick={() => navigate(`/deliveries/${delivery.id}`)}
                       >
@@ -295,6 +324,14 @@ export function DeliveriesPage() {
           </>
         )}
       </div>
+
+      {created && (
+        <Toast
+          title={`משלוח ${created.referenceNumber} נוצר בהצלחה`}
+          detail={`${created.packageCount} חבילות · מס' משלוח #${created.internalNumber}`}
+          onDismiss={() => setCreated(null)}
+        />
+      )}
     </>
   );
 }
