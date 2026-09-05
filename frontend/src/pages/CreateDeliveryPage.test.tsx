@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateDeliveryPage } from "./CreateDeliveryPage";
 import * as apiClient from "../api/client";
@@ -89,5 +89,94 @@ describe("CreateDeliveryPage", () => {
     await user.click(submitButton());
 
     await waitFor(() => expect(screen.getByText("package 1 needs at least 4 photos")).toBeInTheDocument());
+  });
+
+  it("hands the new delivery to the list so it can be pointed out there", async () => {
+    vi.spyOn(apiClient, "createDelivery").mockResolvedValue({
+      id: "d9",
+      internalNumber: 353,
+      direction: "EXPORT",
+      referenceNumber: "SHP-84213",
+      status: "SUBMITTED",
+      createdBy: "local-dev-user",
+      createdAt: new Date().toISOString(),
+      packages: [
+        { id: "p1", label: 1, workflowStatus: "SHIPPED", verdict: null, verdictSource: null, images: [] },
+        { id: "p2", label: 2, workflowStatus: "SHIPPED", verdict: null, verdictSource: null, images: [] },
+      ],
+    });
+
+    function StateProbe() {
+      const location = useLocation();
+      return <pre>{JSON.stringify(location.state)}</pre>;
+    }
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={["/deliveries/new"]}>
+        <Routes>
+          <Route path="/deliveries/new" element={<CreateDeliveryPage />} />
+          <Route path="/deliveries" element={<StateProbe />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await validateReferenceNumber(user);
+    await addPackage(user);
+    await user.click(submitButton());
+
+    await waitFor(() =>
+      expect(screen.getByText(/"id":"d9"/)).toBeInTheDocument()
+    );
+    // The count comes from what the server actually persisted, not the draft.
+    expect(screen.getByText(/"packageCount":2/)).toBeInTheDocument();
+    expect(screen.getByText(/"internalNumber":353/)).toBeInTheDocument();
+  });
+
+  it("refuses to send while photos sit unsaved, rather than dropping them", async () => {
+    const createSpy = vi.spyOn(apiClient, "createDelivery");
+    const user = userEvent.setup();
+    renderPage();
+
+    await validateReferenceNumber(user);
+    await addPackage(user);
+    expect(submitButton()).toBeEnabled();
+
+    // A second package photographed but never saved — the exact case that used
+    // to submit one package and bin the other four photos.
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    await user.upload(
+      input,
+      Array.from({ length: 4 }, (_, i) => new File(["x"], `second-${i}.png`, { type: "image/png" }))
+    );
+
+    expect(await screen.findByText(/יש חבילה שטרם נשמרה/)).toBeInTheDocument();
+    expect(submitButton()).toBeDisabled();
+    await user.click(submitButton());
+    expect(createSpy).not.toHaveBeenCalled();
+
+    // Saving it clears the block and the package goes with the delivery.
+    await user.click(screen.getByRole("button", { name: "שמירת חבילה והוספת הבאה" }));
+    await waitFor(() => expect(screen.queryByText(/יש חבילה שטרם נשמרה/)).not.toBeInTheDocument());
+    expect(submitButton()).toBeEnabled();
+  });
+
+  it("tells an editing employee to finish the edit, not to save a new package", async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await validateReferenceNumber(user);
+    await addPackage(user);
+    expect(submitButton()).toBeEnabled();
+
+    // Reopening a saved package loads its photos into the same upload area.
+    await user.click(screen.getByText("חבילה 1"));
+
+    expect(await screen.findByText(/חבילה נמצאת בעריכה/)).toBeInTheDocument();
+    expect(screen.queryByText(/יש חבילה שטרם נשמרה/)).not.toBeInTheDocument();
+    expect(submitButton()).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "ביטול עריכה" }));
+    await waitFor(() => expect(submitButton()).toBeEnabled());
   });
 });

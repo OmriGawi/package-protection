@@ -1,10 +1,25 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { listDeliveries, type DeliveryPage, type DeliveryStatusKey } from "../api/client";
 import { Logo } from "../components/Logo";
+import { RowChevron } from "../components/RowChevron";
+import { Toast } from "../components/Toast";
 import { DELIVERY_STATUS_INFO, STATUS_FILTERS, formatDate } from "../lib/display";
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+// Long enough to catch the eye and find the row, short enough not to leave the
+// table looking permanently coloured. Runs on its own clock, so dismissing the
+// toast does not cut it short.
+const ROW_FLASH_MS = 6000;
+
+/** Handed over by CreateDeliveryPage through history state. */
+export type CreatedDelivery = {
+  id: string;
+  internalNumber: number;
+  referenceNumber: string;
+  packageCount: number;
+};
 
 export function DeliveriesPage() {
   const navigate = useNavigate();
@@ -21,6 +36,27 @@ export function DeliveriesPage() {
   const [searchInput, setSearchInput] = useState(search);
   const [result, setResult] = useState<DeliveryPage | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Read once into state, then wiped from history: a refresh or a Back onto
+  // this entry must not re-announce a delivery created minutes ago.
+  const location = useLocation();
+  const [created, setCreated] = useState<CreatedDelivery | null>(
+    (location.state as { created?: CreatedDelivery } | null)?.created ?? null
+  );
+  // Tracked apart from `created` so dismissing the toast — by hand or on its
+  // own timer — does not cut the row's fade short.
+  const [flashId, setFlashId] = useState<string | null>(
+    (location.state as { created?: CreatedDelivery } | null)?.created?.id ?? null
+  );
+  // Cleared through the router, never with window.history.replaceState: React
+  // Router keeps its own { usr, key, idx } in history state, and overwriting
+  // that with {} leaves idx undefined — truthy enough to defeat the library's
+  // `|| { idx: null }` fallback, after which pop tracking is broken for the
+  // rest of the session.
+  useEffect(() => {
+    if (!(location.state as { created?: CreatedDelivery } | null)?.created) return;
+    navigate(location.pathname + location.search, { replace: true, state: null });
+  }, [location.state, location.pathname, location.search, navigate]);
 
   // The input is what the user types; the URL is what gets queried. Debounced
   // so a fetch doesn't fire per keystroke.
@@ -69,8 +105,30 @@ export function DeliveriesPage() {
     setParams(next);
   }
 
+  // Timed from when the row is on screen, not from mount: the list is still
+  // being fetched at mount, so a slow response would spend the fade's lifetime
+  // on an empty table and the row would arrive already unmarked.
+  const flashOnScreen = Boolean(flashId && result?.items.some((item) => item.id === flashId));
+  useEffect(() => {
+    if (!flashOnScreen) return;
+    const timer = setTimeout(() => setFlashId(null), ROW_FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [flashOnScreen]);
+
   const pageCount = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
   const isFiltered = Boolean(search || status);
+
+  // Counted off the rows actually returned, not off page × pageSize: a page
+  // past the end has a first-row number but no rows, and "מציג 241–260" over an
+  // empty table would be a lie. Both ends need that guard, not just the start.
+  //
+  // The offset comes from the server's echoed page rather than the URL's: the
+  // previous result stays on screen until the new fetch resolves, so reading
+  // the URL would renumber rows 1-20 as 21-40 for as long as that takes.
+  const offset = result ? (result.page - 1) * result.pageSize : 0;
+  const hasRows = Boolean(result && result.items.length > 0);
+  const rangeStart = hasRows ? offset + 1 : 0;
+  const rangeEnd = hasRows && result ? offset + result.items.length : 0;
 
   return (
     <>
@@ -97,7 +155,10 @@ export function DeliveriesPage() {
         <div style={{ position: "relative", width: 280, maxWidth: "100%" }}>
           <input
             className="field"
-            type="search"
+            // Not type="search": Chrome and Safari draw their own clear button
+            // inside the field, which lands on top of the magnifier below.
+            type="text"
+            style={{ paddingRight: 34 }}
             placeholder="חיפוש לפי מספר משלוח או מספר הזמנה"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
@@ -108,6 +169,30 @@ export function DeliveriesPage() {
             data-bwignore="true"
             data-form-type="other"
           />
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#00000055"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+            focusable="false"
+            // Without this a click on the icon — a natural target, it sits at
+            // the text-start edge — lands on the SVG and never focuses the field.
+            style={{
+              position: "absolute",
+              right: 11,
+              top: "50%",
+              transform: "translateY(-50%)",
+              pointerEvents: "none",
+            }}
+          >
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" />
+          </svg>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -140,15 +225,6 @@ export function DeliveriesPage() {
           <p className="px-6 py-5 text-[13px]" style={{ color: "var(--red)" }}>
             {error}
           </p>
-        ) : result && result.items.length === 0 && result.total === 0 ? (
-          // Three different causes, three different messages. An empty page of
-          // a non-empty result (below) is not "nothing matched", and neither is
-          // "nothing matched" the same as having no deliveries at all.
-          <p className="px-6 py-5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-            {isFiltered
-              ? "לא נמצאו משלוחים התואמים לחיפוש."
-              : 'עדיין לא נוצרו משלוחים. לחצו על "משלוח חדש" כדי להתחיל.'}
-          </p>
         ) : (
           <>
             <div className="overflow-x-auto">
@@ -164,13 +240,24 @@ export function DeliveriesPage() {
                         {heading}
                       </th>
                     ))}
+                    {/* Holds the row chevron. Empty on purpose — a header over
+                        a decorative icon would be read out by a screen reader. */}
+                    <th className="px-6 py-3.5" />
                   </tr>
                 </thead>
                 <tbody>
                   {result && result.items.length === 0 && (
+                    // Three different causes, three different messages. An empty
+                    // page of a non-empty result is not "nothing matched", and
+                    // neither is "nothing matched" the same as having no
+                    // deliveries at all.
                     <tr>
-                      <td colSpan={5} className="px-6 py-5 text-[13px]" style={{ color: "var(--text-secondary)" }}>
-                        אין משלוחים בעמוד זה.
+                      <td colSpan={6} className="px-6 py-12 text-center text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                        {result.total > 0
+                          ? "אין משלוחים בעמוד זה."
+                          : isFiltered
+                            ? "לא נמצאו משלוחים התואמים לחיפוש."
+                            : 'עדיין לא נוצרו משלוחים. לחצו על "משלוח חדש" כדי להתחיל.'}
                       </td>
                     </tr>
                   )}
@@ -179,16 +266,25 @@ export function DeliveriesPage() {
                     return (
                       <tr
                         key={delivery.id}
-                        className="row-hover cursor-pointer"
-                        style={{ borderBottom: "1px solid var(--border)" }}
+                        className={
+                          delivery.id === flashId
+                            ? "row-hover cursor-pointer row-flash"
+                            : "row-hover cursor-pointer"
+                        }
+                        style={{ borderTop: "1px solid var(--border)" }}
                         onClick={() => navigate(`/deliveries/${delivery.id}`)}
                       >
-                        <td className="px-6 py-3.5 font-semibold">#{delivery.internalNumber}</td>
-                        <td className="px-6 py-3.5" style={{ direction: "ltr", textAlign: "right" }}>
+                        <td className="px-6 py-4 font-semibold">#{delivery.internalNumber}</td>
+                        <td
+                          className="px-6 py-4"
+                          style={{ color: "var(--text-secondary)", direction: "ltr", textAlign: "right" }}
+                        >
                           {delivery.referenceNumber}
                         </td>
-                        <td className="px-6 py-3.5">{delivery.packageCount}</td>
-                        <td className="px-6 py-3.5">
+                        <td className="px-6 py-4" style={{ color: "var(--text-secondary)" }}>
+                          {delivery.packageCount}
+                        </td>
+                        <td className="px-6 py-4">
                           <span
                             className="inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-semibold"
                             style={{ color: badge.color, background: badge.bg }}
@@ -196,8 +292,11 @@ export function DeliveriesPage() {
                             {badge.text}
                           </span>
                         </td>
-                        <td className="px-6 py-3.5" style={{ color: "var(--text-secondary)" }}>
+                        <td className="px-6 py-4" style={{ color: "var(--text-secondary)" }}>
                           {formatDate(delivery.createdAt)}
+                        </td>
+                        <td className="px-6 py-4 text-left" style={{ color: "var(--text-secondary)" }}>
+                          <RowChevron />
                         </td>
                       </tr>
                     );
@@ -206,13 +305,16 @@ export function DeliveriesPage() {
               </table>
             </div>
 
-            {result && (
+            {/* Hidden only when there is nothing at all to page through. An
+                empty page of a non-empty result keeps its pager, since that is
+                the only way back to a page that has rows. */}
+            {result && result.total > 0 && (
               <div
                 className="flex items-center justify-between px-6 py-3.5"
                 style={{ borderTop: "1px solid var(--border)" }}
               >
                 <span className="text-[12.5px]" style={{ color: "var(--text-secondary)" }}>
-                  {result.total} משלוחים
+                  {hasRows ? `מציג ${rangeStart}–${rangeEnd} מתוך ${result.total}` : `0 מתוך ${result.total}`}
                 </span>
                 <div className="flex items-center gap-3">
                   <button
@@ -242,6 +344,17 @@ export function DeliveriesPage() {
           </>
         )}
       </div>
+
+      {created && (
+        <Toast
+          // The internal number leads: it is what identifies the delivery to
+          // the employee, and it is what is written on the boxes. The ERP
+          // reference is context, so it drops to the second line.
+          title={`משלוח #${created.internalNumber} נוצר בהצלחה`}
+          detail={`${created.packageCount} חבילות · ${created.referenceNumber}`}
+          onDismiss={() => setCreated(null)}
+        />
+      )}
     </>
   );
 }

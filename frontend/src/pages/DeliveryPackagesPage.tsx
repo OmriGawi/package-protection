@@ -8,6 +8,7 @@ import {
   type Package,
 } from "../api/client";
 import { ReceivePhotosPanel } from "../components/ReceivePhotosPanel";
+import { RowChevron } from "../components/RowChevron";
 import { DIRECTION_TEXT, WORKFLOW_TEXT, formatDate, verdictInfo } from "../lib/display";
 
 type Expansion = { label: number; mode: "view" | "upload" } | null;
@@ -147,6 +148,9 @@ export function DeliveryPackagesPage() {
                       {heading}
                     </th>
                   ))}
+                  {/* Action button, then the row chevron. Both headerless —
+                      neither cell holds a column of data to name. */}
+                  <th className="px-6 py-3.5" />
                   <th className="px-6 py-3.5" />
                 </tr>
               </thead>
@@ -218,6 +222,9 @@ export function DeliveryPackagesPage() {
                           </button>
                         )}
                       </td>
+                      <td className="px-6 py-4 text-left" style={{ color: "var(--text-secondary)" }}>
+                        <RowChevron />
+                      </td>
                     </tr>,
 
                     isExpanded && (
@@ -226,7 +233,7 @@ export function DeliveryPackagesPage() {
                         style={{ borderBottom: "1px solid var(--border)", background: "#fafbfc" }}
                         onClick={(event) => event.stopPropagation()}
                       >
-                        <td colSpan={4} className="px-6 py-5">
+                        <td colSpan={5} className="px-6 py-5">
                           {expanded?.mode === "upload" ? (
                             <ReceivePhotosPanel
                               packageId={pkg.id}

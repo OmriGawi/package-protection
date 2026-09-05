@@ -150,3 +150,49 @@ table {
   cursor: pointer;
   padding: 0;
 }
+
+/* Confirmation that a just-created delivery is the row you are looking at.
+   The wash decays to nothing so the row ends up styled like every other one —
+   nothing here outlives the animation. */
+@keyframes row-flash {
+  from {
+    background: var(--green-soft);
+  }
+  to {
+    background: transparent;
+  }
+}
+/* No `forwards`, so nothing is retained once the fade ends — the base
+   background is transparent anyway.
+   A running animation still outranks .row-hover:hover for those 8 seconds,
+   which would leave the new row as the one row that does not respond to the
+   pointer. !important is the only weight above the animation origin, and
+   deliberately so: a deliberate hover beats a decorative fade. */
+.row-flash {
+  animation: row-flash 6s ease-out;
+}
+.row-flash:hover {
+  background: #00000006 !important;
+}
+.toast {
+  animation: toast-in 0.18s ease-out;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Motion is decoration here — the toast text and the row itself carry the
+   information, so both are safe to show statically. */
+@media (prefers-reduced-motion: reduce) {
+  .row-flash,
+  .toast {
+    animation: none;
+  }
+}
