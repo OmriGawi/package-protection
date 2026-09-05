@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-const AUTO_DISMISS_MS = 5000;
+const AUTO_DISMISS_MS = 9000;
 
 type ToastProps = {
   title: string;

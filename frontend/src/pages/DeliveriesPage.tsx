@@ -10,7 +10,7 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 // Outlives the toast on purpose: the row is the thing being pointed at, so it
 // stays marked for a while after the message goes.
-const ROW_FLASH_MS = 8000;
+const ROW_FLASH_MS = 14000;
 
 /** Handed over by CreateDeliveryPage through history state. */
 export type CreatedDelivery = {

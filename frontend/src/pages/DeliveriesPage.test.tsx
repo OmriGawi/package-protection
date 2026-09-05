@@ -328,15 +328,15 @@ describe("DeliveriesPage", () => {
       const flashedRow = () => within(screen.getByRole("table")).getAllByRole("row")[1];
       expect(flashedRow().className).toContain("row-flash");
 
-      // Toast goes at 5s; the row is the thing being pointed at, so it stays.
+      // Toast goes at 9s; the row is the thing being pointed at, so it stays.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5000);
+        await vi.advanceTimersByTimeAsync(9000);
       });
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
       expect(flashedRow().className).toContain("row-flash");
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(3100);
+        await vi.advanceTimersByTimeAsync(5100);
       });
       expect(flashedRow().className).not.toContain("row-flash");
     } finally {
@@ -348,7 +348,7 @@ describe("DeliveriesPage", () => {
     // A response slower than the fade itself: timed from mount, the row would
     // arrive already unmarked.
     vi.spyOn(apiClient, "listDeliveries").mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve(page([row({ id: "d1" })])), 9000))
+      () => new Promise((resolve) => setTimeout(() => resolve(page([row({ id: "d1" })])), 15000))
     );
     vi.useFakeTimers();
 
@@ -356,14 +356,14 @@ describe("DeliveriesPage", () => {
       renderAfterCreate();
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(9100);
+        await vi.advanceTimersByTimeAsync(15100);
       });
 
       const flashedRow = () => within(screen.getByRole("table")).getAllByRole("row")[1];
       expect(flashedRow().className).toContain("row-flash");
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(8100);
+        await vi.advanceTimersByTimeAsync(14100);
       });
       expect(flashedRow().className).not.toContain("row-flash");
     } finally {
@@ -407,7 +407,7 @@ describe("DeliveriesPage", () => {
       // Anything that re-renders the page — a keystroke in the search box, a
       // resolved fetch — hands the toast a fresh onDismiss identity.
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(3000);
+        await vi.advanceTimersByTimeAsync(6000);
       });
       view.rerender(
         <MemoryRouter initialEntries={[{ pathname: "/deliveries", state: { created: createdHandoff } }]}>
@@ -416,7 +416,7 @@ describe("DeliveriesPage", () => {
       );
 
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(2100);
+        await vi.advanceTimersByTimeAsync(3100);
       });
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
     } finally {
@@ -424,7 +424,7 @@ describe("DeliveriesPage", () => {
     }
   });
 
-  it("takes the confirmation away on its own after five seconds", async () => {
+  it("takes the confirmation away on its own after nine seconds", async () => {
     vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row({ id: "d1" })]));
     vi.useFakeTimers();
 
@@ -436,8 +436,15 @@ describe("DeliveriesPage", () => {
       });
       expect(screen.getByRole("status")).toBeInTheDocument();
 
+      // Still there just before the deadline, so this pins the duration rather
+      // than merely asserting "gone by nine seconds".
       await act(async () => {
-        await vi.advanceTimersByTimeAsync(5000);
+        await vi.advanceTimersByTimeAsync(8000);
+      });
+      expect(screen.getByRole("status")).toBeInTheDocument();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1100);
       });
       expect(screen.queryByRole("status")).not.toBeInTheDocument();
     } finally {
