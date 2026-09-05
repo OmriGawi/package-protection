@@ -179,6 +179,51 @@ describe("DashboardPage", () => {
     );
   });
 
+  it("offers the review action only where a verdict can still change", async () => {
+    vi.spyOn(apiClient, "listPackages").mockResolvedValue(
+      page([
+        row({ packageId: "a", needsManagerReview: true }),
+        row({ packageId: "b", verdict: "INTACT", needsManagerReview: false }),
+        // A failed call has no verdict to override — retrying is what that
+        // state offers, and it lives on the employee's own row (§4.2).
+        row({ packageId: "c", workflowStatus: "CHECK_FAILED", verdict: null, needsManagerReview: false }),
+      ])
+    );
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getAllByText("SHP-88291").length).toBe(3));
+    expect(screen.getAllByRole("button", { name: "סקירה" })).toHaveLength(1);
+  });
+
+  it("sends the review action to the same evidence the row does", async () => {
+    vi.spyOn(apiClient, "listPackages").mockResolvedValue(
+      page([row({ label: 4, deliveryId: "d3", needsManagerReview: true })])
+    );
+    const user = userEvent.setup();
+
+    function LocationProbe() {
+      const location = useLocation();
+      return <pre>{location.pathname + location.search}</pre>;
+    }
+
+    render(
+      <MemoryRouter initialEntries={["/dashboard"]}>
+        <Routes>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/deliveries/:id" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    await waitFor(() => expect(screen.getByRole("button", { name: "סקירה" })).toBeInTheDocument());
+    await user.click(screen.getByRole("button", { name: "סקירה" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("/deliveries/d3?package=4&from=dashboard")).toBeInTheDocument()
+    );
+  });
+
   it("keeps the pager when a page is past the end, and drops it when there is nothing", async () => {
     const list = vi.spyOn(apiClient, "listPackages").mockResolvedValue(
       page([], { total: 100, page: 9 })

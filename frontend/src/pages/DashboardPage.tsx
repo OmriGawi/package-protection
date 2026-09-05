@@ -177,13 +177,16 @@ export function DashboardPage() {
                         </th>
                       )
                     )}
+                    {/* Review action, then the row chevron — neither names a
+                        column of data. */}
+                    <th className="px-6 py-3.5" />
                     <th className="px-6 py-3.5" />
                   </tr>
                 </thead>
                 <tbody>
                   {result && result.items.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-6 py-12 text-center text-[13px]" style={{ color: "var(--text-secondary)" }}>
+                      <td colSpan={8} className="px-6 py-12 text-center text-[13px]" style={{ color: "var(--text-secondary)" }}>
                         {result.total > 0 ? "אין חבילות בעמוד זה." : "לא נמצאו חבילות תואמות."}
                       </td>
                     </tr>
@@ -218,6 +221,24 @@ export function DashboardPage() {
                         </td>
                         <td className="px-6 py-4 text-[12.5px]" style={{ color: "var(--text-secondary)" }}>
                           {verdictSourceText(row)}
+                        </td>
+                        <td className="px-6 py-4 text-left">
+                          {/* Only where a human can still change the verdict
+                              (§4.4.4). Same destination as the row — the button
+                              marks which rows are waiting on a decision. */}
+                          {row.needsManagerReview && (
+                            <button
+                              type="button"
+                              className="px-3.5 py-1.5 rounded-lg text-[12.5px] font-semibold"
+                              style={{ border: "1px solid var(--navy)", color: "var(--navy)" }}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                openEvidence(row.deliveryId, row.label);
+                              }}
+                            >
+                              סקירה
+                            </button>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-left" style={{ color: "var(--text-secondary)" }}>
                           <RowChevron />

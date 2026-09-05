@@ -21,7 +21,7 @@ stateDiagram-v2
   CHECKING --> RECEIVED: verdict returned
   CHECKING --> CHECK_FAILED: call failed
   CHECK_FAILED --> CHECKING: retry
-  RECEIVED --> RECEIVED: manual override<br/>(with a note)
+  RECEIVED --> RECEIVED: manager override<br/>INTACT or OPENED, note required
   RECEIVED --> [*]
 ```
 
@@ -129,3 +129,30 @@ and Back still returns to the dashboard rather than to the employee's own list.
 
 Its stat cards are fixed: they count the whole operation and ignore the search
 and filter below them.
+
+## The manager's override (§4.4.5)
+
+The dashboard routes to the evidence; the decision is made beside it, under the
+photos on the §4.2 page.
+
+```mermaid
+flowchart TD
+  A["Verdict is OPENED or INCONCLUSIVE,<br/>source is not MANUAL"] --> B["Review panel appears<br/>under the photos"]
+  B --> C{"Note written?"}
+  C -->|no| D["Both buttons disabled"]
+  D --> C
+  C -->|yes| E["אישור כתקינה"]
+  C -->|yes| F["אישור כנפתחה"]
+  E --> G["verdict + verdictSource=MANUAL<br/>note stored permanently"]
+  F --> G
+  G --> H["Panel becomes a read-only line;<br/>row leaves the review queue"]
+```
+
+Both outcomes, not one. `INCONCLUSIVE` exists because the algorithm could not
+decide, so the physical check has to resolve it either way — an earlier
+wireframe offered only "confirm intact", which assumed every override reverses
+a false positive.
+
+Confirming a verdict still ends the review: once a human has been through it
+there is nothing left to do, whatever they concluded. A `CHECK_FAILED` package
+gets no panel — there is no verdict to override, only a call to retry.

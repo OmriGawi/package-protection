@@ -17,6 +17,12 @@ export interface Package {
   workflowStatus: WorkflowStatus;
   verdict: Verdict | null;
   verdictSource: "API" | "MANUAL" | null;
+  // Set once a manager has reviewed the package (DESIGN.md §4.4.5). The note
+  // is the only record of what the physical check found, so it stays on screen
+  // permanently afterwards rather than being a transient confirmation.
+  verdictOverriddenBy: string | null;
+  overriddenAt: string | null;
+  overrideNote: string | null;
   images: PackageImage[];
 }
 
@@ -188,6 +194,16 @@ export function listPackages({
 
 export function getDelivery(id: string) {
   return request<DeliveryDetail>(`/api/deliveries/${id}`);
+}
+
+/** The manager's verdict override (DESIGN.md §4.4.5). Two outcomes only —
+ *  INCONCLUSIVE is what is being resolved, not something to choose. */
+export function reviewPackage(packageId: string, verdict: "INTACT" | "OPENED", note: string) {
+  return request<Package>(`/api/packages/${packageId}/review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ verdict, note }),
+  });
 }
 
 export function imageUrl(imageId: string) {

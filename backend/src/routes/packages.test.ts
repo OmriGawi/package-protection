@@ -190,6 +190,153 @@ describe("recoverInterruptedChecks", () => {
   });
 });
 
+describe("POST /api/packages/:id/review (DESIGN.md §4.4.5)", () => {
+  /** A package that has been through a check and carries a verdict. */
+  async function reviewablePackage(verdict: "OPENED" | "INCONCLUSIVE" | "INTACT") {
+    const packageId = await shippedPackage();
+    await prisma.package.update({
+      where: { id: packageId },
+      data: { workflowStatus: "RECEIVED", verdict, verdictSource: "API" },
+    });
+    return packageId;
+  }
+
+  it("resolves an inconclusive result in either direction", async () => {
+    // The whole reason INCONCLUSIVE exists is that the algorithm could not
+    // decide, so the physical check has to be able to land on either verdict.
+    for (const verdict of ["INTACT", "OPENED"] as const) {
+      const packageId = await reviewablePackage("INCONCLUSIVE");
+
+      const response = await request(app)
+        .post(`/api/packages/${packageId}/review`)
+        .send({ verdict, note: "נבדק פיזית במחסן" })
+        .expect(200);
+
+      expect(response.body.verdict).toBe(verdict);
+      expect(response.body.verdictSource).toBe("MANUAL");
+      expect(response.body.overrideNote).toBe("נבדק פיזית במחסן");
+      expect(response.body.overriddenAt).not.toBeNull();
+      expect(response.body.verdictOverriddenBy).toBeTruthy();
+    }
+  });
+
+  it("requires a note, since it is the only record of what was found", async () => {
+    const packageId = await reviewablePackage("OPENED");
+
+    await request(app)
+      .post(`/api/packages/${packageId}/review`)
+      .send({ verdict: "INTACT" })
+      .expect(400);
+
+    // Whitespace is not a note.
+    await request(app)
+      .post(`/api/packages/${packageId}/review`)
+      .send({ verdict: "INTACT", note: "   " })
+      .expect(400);
+
+    const unchanged = await prisma.package.findUniqueOrThrow({ where: { id: packageId } });
+    expect(unchanged.verdictSource).toBe("API");
+  });
+
+  it("rejects a verdict that is not one of the two outcomes", async () => {
+    const packageId = await reviewablePackage("OPENED");
+
+    // INCONCLUSIVE is what a human is resolving, not something they can choose.
+    await request(app)
+      .post(`/api/packages/${packageId}/review`)
+      .send({ verdict: "INCONCLUSIVE", note: "n" })
+      .expect(400);
+  });
+
+  it("refuses a package with no verdict to override", async () => {
+    // Still in transit: never checked, so there is nothing to correct.
+    const shipped = await shippedPackage();
+    await request(app)
+      .post(`/api/packages/${shipped}/review`)
+      .send({ verdict: "INTACT", note: "n" })
+      .expect(409);
+
+    // A failed call has no verdict either — that state offers a retry (§4.2).
+    const failed = await shippedPackage();
+    await prisma.package.update({
+      where: { id: failed },
+      data: { workflowStatus: "CHECK_FAILED" },
+    });
+    await request(app)
+      .post(`/api/packages/${failed}/review`)
+      .send({ verdict: "INTACT", note: "n" })
+      .expect(409);
+  });
+
+  it("404s for a package that does not exist", async () => {
+    await request(app)
+      .post("/api/packages/00000000-0000-0000-0000-000000000000/review")
+      .send({ verdict: "INTACT", note: "n" })
+      .expect(404);
+  });
+
+  it("takes the reviewed package out of the dashboard's review queue", async () => {
+    const packageId = await reviewablePackage("OPENED");
+    const created = await prisma.package.findUniqueOrThrow({
+      where: { id: packageId },
+      include: { delivery: true },
+    });
+
+    await request(app)
+      .post(`/api/packages/${packageId}/review`)
+      .send({ verdict: "OPENED", note: "אכן נפתחה" })
+      .expect(200);
+
+    // Searched by internal number rather than read off page 1: a reviewed
+    // package deliberately sinks to the bottom of the priority ladder, so
+    // scanning the first page finds nothing and asserts nothing. The reference
+    // is no good either — several deliveries share one, so the match spills
+    // past a page.
+    const dashboard = await request(app)
+      .get(`/api/packages?search=${created.delivery.internalNumber}`)
+      .expect(200);
+
+    const row = dashboard.body.items.find(
+      (item: { packageId: string }) => item.packageId === packageId
+    );
+    // Confirming the verdict rather than reversing it still ends the review:
+    // a human has been through it, so there is nothing left to do (§4.4.3).
+    expect(row).toBeDefined();
+    expect(row.needsManagerReview).toBe(false);
+    expect(row.verdictSource).toBe("MANUAL");
+  });
+
+  it("refuses a second review rather than overwriting the first note", async () => {
+    const packageId = await reviewablePackage("OPENED");
+
+    await request(app)
+      .post(`/api/packages/${packageId}/review`)
+      .send({ verdict: "INTACT", note: "הבדיקה הראשונה" })
+      .expect(200);
+
+    await request(app)
+      .post(`/api/packages/${packageId}/review`)
+      .send({ verdict: "OPENED", note: "ניסיון לדרוס" })
+      .expect(409);
+
+    // The note is the only record of what the first physical check found.
+    const pkg = await prisma.package.findUniqueOrThrow({ where: { id: packageId } });
+    expect(pkg.overrideNote).toBe("הבדיקה הראשונה");
+    expect(pkg.verdict).toBe("INTACT");
+  });
+
+  it("refuses to review a result that is already resolved", async () => {
+    // INTACT has nothing left to decide (§4.4.3), and the dashboard offers no
+    // review action for it — the API must not accept one either.
+    const packageId = await reviewablePackage("INTACT");
+
+    await request(app)
+      .post(`/api/packages/${packageId}/review`)
+      .send({ verdict: "OPENED", note: "n" })
+      .expect(409);
+  });
+});
+
 describe("GET /api/packages (dashboard, DESIGN.md §4.4)", () => {
   it("returns a page of packages with the operation-wide stats beside it", async () => {
     const response = await request(app).get("/api/packages").expect(200);

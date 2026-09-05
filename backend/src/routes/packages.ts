@@ -137,6 +137,69 @@ packagesRouter.post("/:id/post-receive-photos", upload.any(), async (req: Reques
 });
 
 /**
+ * The Inventory Manager's verdict override (DESIGN.md §4.4.5).
+ *
+ * Two outcomes, not one: INCONCLUSIVE exists precisely because the algorithm
+ * could not decide, so a physical check has to be able to resolve it either
+ * way. An earlier wireframe offered only "confirm intact", which silently
+ * assumed every override is a false positive being corrected.
+ *
+ * The note is required. It is the only record of what the physical check
+ * actually found, and it outlives everyone who remembers the package.
+ */
+packagesRouter.post("/:id/review", async (req: Request<{ id: string }>, res) => {
+  const { verdict, note } = req.body as { verdict?: unknown; note?: unknown };
+
+  if (verdict !== "INTACT" && verdict !== "OPENED") {
+    return res.status(400).json({ error: "verdict must be INTACT or OPENED" });
+  }
+
+  const trimmedNote = typeof note === "string" ? note.trim() : "";
+  if (!trimmedNote) {
+    return res.status(400).json({ error: "note is required" });
+  }
+
+  const pkg = await prisma.package.findUnique({ where: { id: req.params.id } });
+  if (!pkg) return res.status(404).json({ error: "package not found" });
+
+  // The same rule the dashboard sorts and labels by (packageQuery's
+  // NEEDS_REVIEW): a verdict a human can still change. A failed call has none
+  // to override — retrying is what that state offers (§4.2) — a package in
+  // transit was never checked, and an INTACT result is already resolved
+  // (§4.4.3). The three must agree, or a package the dashboard never offers
+  // for review is still reviewable through a hand-made request.
+  const reviewable =
+    pkg.workflowStatus === "RECEIVED" &&
+    (pkg.verdict === "OPENED" || pkg.verdict === "INCONCLUSIVE") &&
+    pkg.verdictSource !== "MANUAL";
+
+  if (!reviewable) {
+    return res.status(409).json({ error: "this package has no verdict to review" });
+  }
+
+  // Guarded in the UPDATE itself, not just by the read above: two managers
+  // submitting at once would otherwise both pass the check and the second
+  // would overwrite the first's note — destroying the only record of what that
+  // physical check found.
+  const { count } = await prisma.package.updateMany({
+    where: { id: pkg.id, verdictSource: { not: "MANUAL" } },
+    data: {
+      verdict,
+      verdictSource: "MANUAL",
+      verdictOverriddenBy: CURRENT_USER,
+      overriddenAt: new Date(),
+      overrideNote: trimmedNote,
+    },
+  });
+
+  if (count === 0) {
+    return res.status(409).json({ error: "this package has already been reviewed" });
+  }
+
+  res.json(await packageWithImages(pkg.id));
+});
+
+/**
  * Retry after a failed call. The photos are already stored, so this re-runs
  * the same check rather than asking for them again (§4.2).
  */

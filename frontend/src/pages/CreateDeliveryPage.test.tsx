@@ -101,8 +101,28 @@ describe("CreateDeliveryPage", () => {
       createdBy: "local-dev-user",
       createdAt: new Date().toISOString(),
       packages: [
-        { id: "p1", label: 1, workflowStatus: "SHIPPED", verdict: null, verdictSource: null, images: [] },
-        { id: "p2", label: 2, workflowStatus: "SHIPPED", verdict: null, verdictSource: null, images: [] },
+        {
+          id: "p1",
+          label: 1,
+          workflowStatus: "SHIPPED",
+          verdict: null,
+          verdictSource: null,
+          verdictOverriddenBy: null,
+          overriddenAt: null,
+          overrideNote: null,
+          images: [],
+        },
+        {
+          id: "p2",
+          label: 2,
+          workflowStatus: "SHIPPED",
+          verdict: null,
+          verdictSource: null,
+          verdictOverriddenBy: null,
+          overriddenAt: null,
+          overrideNote: null,
+          images: [],
+        },
       ],
     });
 
