@@ -76,7 +76,7 @@ const STATUS_CASE = Prisma.sql`
 `;
 
 /** Makes %, _ and the escape character itself literal inside a LIKE pattern. */
-function escapeLikeWildcards(value: string): string {
+export function escapeLikeWildcards(value: string): string {
   return value.replace(/[\\%_]/g, (match) => `\\${match}`);
 }
 

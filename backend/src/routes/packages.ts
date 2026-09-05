@@ -11,8 +11,59 @@ import {
 import { storage } from "../lib/storage";
 import { CURRENT_USER } from "../lib/currentUser";
 import { claimForCheck, releaseClaim, startCheck } from "../services/tamperCheckService";
+import {
+  PACKAGE_FILTERS,
+  findPackagePage,
+  isPackageFilter,
+  type PackageFilterKey,
+} from "../services/packageQuery";
 
 export const packagesRouter = Router();
+
+/**
+ * The Inventory Manager's dashboard (DESIGN.md §4.4): every package across
+ * every delivery, most urgent first, with an operation-wide overview alongside
+ * the page.
+ *
+ * Registered before "/:id/..." routes below, though it cannot collide with
+ * them — "/" is not a package id.
+ */
+packagesRouter.get("/", async (req, res) => {
+  const { search, filter, page } = req.query as {
+    search?: unknown;
+    filter?: unknown;
+    page?: unknown;
+  };
+
+  // Express 5 turns a repeated ?search=a&search=b into an array; calling
+  // .trim() on it would 500 rather than answer.
+  for (const [name, value] of Object.entries({ search, filter, page })) {
+    if (value !== undefined && typeof value !== "string") {
+      return res.status(400).json({ error: `${name} must be given at most once` });
+    }
+  }
+
+  // Rejected rather than coerced: silently serving everything for a typo'd
+  // filter looks exactly like a filter that matched nothing.
+  if (filter !== undefined && !isPackageFilter(filter as string)) {
+    return res.status(400).json({
+      error: `filter must be one of ${PACKAGE_FILTERS.join(", ")}`,
+    });
+  }
+
+  const pageNumber = page === undefined ? 1 : Number(page);
+  if (!Number.isInteger(pageNumber) || pageNumber < 1) {
+    return res.status(400).json({ error: "page must be a positive integer" });
+  }
+
+  const result = await findPackagePage({
+    search: (search as string | undefined)?.trim() || undefined,
+    filter: filter as PackageFilterKey | undefined,
+    page: pageNumber,
+  });
+
+  res.json(result);
+});
 
 function packageWithImages(id: string) {
   return prisma.package.findUnique({

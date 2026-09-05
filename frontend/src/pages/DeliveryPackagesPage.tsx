@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import {
   getDelivery,
   imageUrl,
@@ -29,6 +29,13 @@ function PhotoGrid({ images }: { images: Package["images"] }) {
 
 export function DeliveryPackagesPage() {
   const { id } = useParams<{ id: string }>();
+  // The dashboard links straight at one package's evidence (DESIGN.md §4.4.4).
+  // Both live in the query string rather than history state so a refresh keeps
+  // the panel open and Back still knows where it came from.
+  const [params] = useSearchParams();
+  const deepLinkedLabel = Number(params.get("package"));
+  const cameFromDashboard = params.get("from") === "dashboard";
+
   const [delivery, setDelivery] = useState<DeliveryDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Expansion>(null);
@@ -47,6 +54,22 @@ export function DeliveryPackagesPage() {
   useEffect(() => {
     load().catch(() => setError("טעינת המשלוח נכשלה"));
   }, [load]);
+
+  // Opened once, after the delivery arrives — the panel cannot be opened on a
+  // package that has not been fetched yet. Not re-applied afterwards, so
+  // collapsing the panel does not immediately reopen it.
+  // Keyed by the link itself, not a bare boolean: this component stays mounted
+  // across /deliveries/d1?package=2 → /deliveries/d7?package=3, and a boolean
+  // would leave the second panel closed.
+  const appliedDeepLink = useRef<string | null>(null);
+  useEffect(() => {
+    const key = `${id}:${deepLinkedLabel}`;
+    if (appliedDeepLink.current === key || !delivery) return;
+    if (!Number.isInteger(deepLinkedLabel)) return;
+    if (!delivery.packages.some((p) => p.label === deepLinkedLabel)) return;
+    appliedDeepLink.current = key;
+    setExpanded({ label: deepLinkedLabel, mode: "view" });
+  }, [delivery, deepLinkedLabel, id]);
 
   const checkingLabels = delivery?.packages.filter((p) => p.workflowStatus === "CHECKING") ?? [];
   const isChecking = checkingLabels.length > 0;
@@ -114,11 +137,15 @@ export function DeliveryPackagesPage() {
 
   return (
     <>
-      <Link to="/deliveries" className="inline-flex items-center gap-1.5 text-sm font-semibold mb-5" style={{ color: "var(--blue)" }}>
+      <Link
+        to={cameFromDashboard ? "/dashboard" : "/deliveries"}
+        className="inline-flex items-center gap-1.5 text-sm font-semibold mb-5"
+        style={{ color: "var(--blue)" }}
+      >
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
           <path d="M10 6l6 6-6 6" />
         </svg>
-        חזרה למשלוחים
+        {cameFromDashboard ? "חזרה ללוח הבקרה" : "חזרה למשלוחים"}
       </Link>
 
       {error && (
