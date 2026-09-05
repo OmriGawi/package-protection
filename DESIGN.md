@@ -771,3 +771,17 @@ changelog entries.
   `docs/production-readiness.md` (P5, P22, P23, and part of P3, P24 and P25);
   the one thing deliberately left out is the actor seam, whose shape depends on
   which Keycloak claim carries identity.
+- 2026-09-05: **Query indexes.** The schema had none beyond its keys, and
+  Prisma creates no index for a foreign key on PostgreSQL, so every read of a
+  package's photos and every cascade delete was a sequential scan. Added four,
+  each chosen by reading the query that needs it rather than by indexing every
+  column: `Package.workflowStatus` and `Package.verdict` for the dashboard
+  filters and the startup recovery scan, `PackageImage(packageId, sequence)`
+  because those reads always filter by package and order by sequence, and
+  `TamperCheck.packageId` for the delete cascade. Two obvious-looking candidates
+  were left out on the same evidence — `Delivery.createdAt`, since the list
+  orders by internal number rather than date, and `Delivery.referenceNumber`,
+  since search is a leading-wildcard ILIKE that no B-tree serves. The dashboard's
+  priority ordering is a CASE expression and stays unindexable by construction;
+  sizing any of this properly still waits on knowing real volume
+  (`docs/production-readiness.md` P16–P20).

@@ -75,6 +75,15 @@ model Package {
   checks TamperCheck[]
 
   @@unique([deliveryId, label])
+  // The dashboard filters on these (services/packageQuery.ts) and startup
+  // recovery scans workflowStatus. Its priority ORDER BY is a CASE expression
+  // and stays unindexable — see P18 in docs/production-readiness.md.
+  //
+  // The verdict index is composite because no query asks for a verdict alone:
+  // every one pairs it with a workflow predicate, since a failed call is the
+  // state the row is in whatever stale verdict it still carries.
+  @@index([workflowStatus])
+  @@index([verdict, workflowStatus])
 }
 
 enum CheckStatus {
@@ -101,6 +110,16 @@ model TamperCheck {
   status      CheckStatus @default(PENDING)
   requestedAt DateTime    @default(now()) @db.Timestamptz(3)
   completedAt DateTime?   @db.Timestamptz(3)
+
+  // packageId: for the cascade when a Delivery is deleted, which would
+  // otherwise scan the whole table per package, and for the audit-trail read
+  // this row exists to make possible — nothing queries it that way yet.
+  //
+  // status: recoverInterruptedChecks scans for PENDING on every boot, and this
+  // table gains a row per attempt and is never pruned, so that scan is the one
+  // here that grows without bound.
+  @@index([packageId])
+  @@index([status])
 }
 
 model PackageImage {
@@ -114,4 +133,9 @@ model PackageImage {
   uploadedBy  String
   uploadedAt  DateTime @default(now()) @db.Timestamptz(3)
   sequence    Int
+
+  // Composite rather than packageId alone: every read of a package's photos
+  // filters by packageId and orders by sequence (IMAGE_SELECT, and the check's
+  // own read in tamperCheckService), so one index serves both halves.
+  @@index([packageId, sequence])
 }

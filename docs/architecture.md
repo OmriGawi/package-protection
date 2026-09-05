@@ -170,6 +170,12 @@ erDiagram
   }
 ```
 
+Indexes are added per query rather than per column, and Prisma creates none for
+foreign keys on PostgreSQL — so every index in `schema.prisma` is there because
+something reads that way, and `src/lib/schemaIndexes.test.ts` says which query
+each one serves. `Package.deliveryId` is deliberately absent: the
+`@@unique([deliveryId, label])` constraint already leads with it.
+
 Two model decisions worth knowing before changing anything here:
 
 - **`TamperCheck` is one row per attempt**, not one per package. A retry after a

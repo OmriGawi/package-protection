@@ -361,25 +361,36 @@ the read path entirely.
 
 ## 5. Database and query shape — Scale
 
-### P16 — The schema has no indexes
+### P16 — The indexes exist, but the volume that would size them does not
 
-**Today.** `backend/prisma/schema.prisma` declares zero `@@index`. Prisma does
-not create indexes for foreign keys on PostgreSQL, so the only indexes present
-are the primary keys, `Delivery.internalNumber`'s unique constraint, and the
-composite `@@unique([deliveryId, label])`.
+**Today.** Five indexes were added deliberately, each tied to a query that runs
+(`backend/prisma/migrations/…_add_query_indexes`): `Package.workflowStatus` and
+`Package(verdict, workflowStatus)` for the dashboard filters and the startup
+recovery scan, `PackageImage(packageId, sequence)` for every read of a package's
+photos, `TamperCheck.packageId` for the delete cascade, and `TamperCheck.status`
+for the boot-time scan for `PENDING` — that table gains a row per attempt and is
+never pruned, so it is the one scan here that grows without bound.
+`Package.deliveryId` needs none — the `@@unique([deliveryId, label])` constraint
+already leads with it.
 
-**Breaks when.** Row counts grow past what a sequential scan hides. Missing, at
-minimum: `PackageImage.packageId`, `TamperCheck.packageId`,
-`Package.workflowStatus`, `Delivery.createdAt`, and `Delivery.referenceNumber`.
-`Package.deliveryId` is served by the composite unique's leading column.
+Two candidates were deliberately *not* added, because nothing queries that way:
+`Delivery.createdAt` (the list orders by `internalNumber`, not date) and
+`Delivery.referenceNumber` (search is a leading-wildcard `ILIKE`, which no
+B-tree can serve — that is P17).
+
+**Breaks when.** The next index is chosen the way these were, by reading the
+query — or is not chosen at all, because nobody has a dataset big enough for a
+plan to look different from a sequential scan.
 
 **Open question.** What is the real volume — deliveries per day, packages per
-delivery, and how many years of history stay online? A hundred deliveries a day
-and five years is a very different index and partitioning story from ten
-thousand a day.
+delivery, and how many years of history stay online? And is there an
+environment with realistic data where `EXPLAIN` means anything (§8)?
 
-**Once answered.** Add the indexes in a migration, informed by `EXPLAIN` against
-a realistically sized dataset rather than by guesswork.
+**Once answered.** Re-check the plans for the two list queries against real
+volume, and revisit P17–P20 with numbers rather than reasoning. One production
+detail to remember when the tables are no longer small: `CREATE INDEX` locks
+writes, and Prisma runs a migration inside a transaction, so a concurrent build
+has to be run outside the normal migration path.
 
 ### P17 — Search is an unindexed pattern match
 
