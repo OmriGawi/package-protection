@@ -65,7 +65,7 @@ visible.
 | Method | Path | Purpose |
 |---|---|---|
 | `POST` | `/api/deliveries/validate-reference` | Check a shipment/PO number against the ERP mock |
-| `POST` | `/api/deliveries` | Create a delivery with all its packages and pre-ship photos, in one request |
+| `POST` | `/api/deliveries` | Create a delivery with all its packages and pre-ship photos, in one request. Honours `Idempotency-Key`: a repeat answers 200 with the original delivery |
 | `GET` | `/api/deliveries` | The list: derived status, search, filter, sort, paging |
 | `GET` | `/api/deliveries/:id` | One delivery with packages and images |
 | `POST` | `/api/packages/:id/post-receive-photos` | Upload receive photos, then run the check |
@@ -102,10 +102,12 @@ sequenceDiagram
 
   U->>P: adds packages, 4+ photos each
   U->>P: Submit
-  P->>C: createDelivery(FormData)
+  P->>C: createDelivery(FormData, idempotencyKey)
   C->>R: POST /api/deliveries
   R->>E: re-validate the reference
   Note over R,E: Server-side too — a direct<br/>request could skip the client call
+  R->>D: look up the idempotency key
+  Note over R,D: A retry after a timeout gets<br/>the delivery it already made
   R->>S: write each photo
   S-->>R: storagePath per photo
   R->>D: Delivery + Packages + Images, one transaction
@@ -126,6 +128,19 @@ implementation replaces one file:
 
 `storagePath` is deliberately opaque to the rest of the system: nothing but the
 storage client interprets it, so swapping disk for a service changes no schema.
+
+## Upload bounds
+
+Three limits, each a different failure. multer caps one photo at 15MB and a
+request at 200 files; `middleware/uploadSize.ts` caps the request as a whole at
+150MB, answering before multer buffers anything, because the first two multiply
+out to roughly 3GB held in memory ahead of any validation. It bounds memory, not
+transfer: Node drains the body it will never parse, and destroying the
+connection instead would trade a readable 413 for a connection reset. The third reads `Content-Length`
+rather than counting the stream — counting would consume the body multer is
+about to parse — so a chunked request without that header falls through to the
+per-file limits. Closing that properly means taking the bytes out of this
+process, which is the open half of P6 in `docs/production-readiness.md`.
 
 ## Data model
 

@@ -7,6 +7,18 @@ export const MIN_PHOTOS_PER_PACKAGE = 4;
 export const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
 export const MAX_PHOTOS_PER_REQUEST = 200;
 
+/**
+ * The whole request, not one file of it.
+ *
+ * The two limits above multiply out to roughly 3GB, which is not a bound worth
+ * having: memoryStorage buffers every part before our own validation runs. 150MB
+ * still comfortably holds a large delivery of phone photos — twenty packages at
+ * eight photos each, at the sizes a phone actually produces — while keeping one
+ * request from being able to take the process down. Enforced by
+ * `middleware/uploadSize.ts`, ahead of multer.
+ */
+export const MAX_UPLOAD_BYTES = 150 * 1024 * 1024;
+
 // Bounded because memoryStorage buffers every part in RAM before any of our
 // own validation runs — without limits one oversized POST can take the process
 // down. A real size/resolution floor is still open (DESIGN.md §9); these are

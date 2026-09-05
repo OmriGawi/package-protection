@@ -11,6 +11,7 @@ import {
 import { storage } from "../lib/storage";
 import { CURRENT_USER } from "../lib/currentUser";
 import { retryLimiter, uploadLimiter } from "../middleware/rateLimit";
+import { limitUploadBytes } from "../middleware/uploadSize";
 import { claimForCheck, releaseClaim, startCheck } from "../services/tamperCheckService";
 import {
   PACKAGE_FILTERS,
@@ -84,6 +85,7 @@ function packageWithImages(id: string) {
 packagesRouter.post(
   "/:id/post-receive-photos",
   uploadLimiter,
+  limitUploadBytes,
   upload.any(),
   async (req: Request<{ id: string }>, res) => {
     const pkg = await prisma.package.findUnique({ where: { id: req.params.id } });

@@ -1,4 +1,4 @@
-import { Router, type Request, type Response } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import { randomUUID } from "crypto";
 import { prisma } from "../lib/prisma";
 import { storage } from "../lib/storage";
@@ -11,7 +11,10 @@ import {
   upload,
 } from "../lib/photoUpload";
 import { CURRENT_USER } from "../lib/currentUser";
+import { IDEMPOTENCY_KEY_ERROR, readIdempotencyKey } from "../lib/idempotency";
+import { log } from "../lib/logger";
 import { uploadLimiter } from "../middleware/rateLimit";
+import { limitUploadBytes } from "../middleware/uploadSize";
 import { validateReference, type Direction } from "../services/erpMock";
 import {
   DELIVERY_STATUSES,
@@ -58,7 +61,25 @@ deliveriesRouter.post("/validate-reference", async (req, res) => {
 // A delivery and all of its packages arrive together in one multipart request:
 // nothing is persisted before Submit (DESIGN.md §3), so the photos are still
 // in-session File objects on the client until this call.
-deliveriesRouter.post("/", uploadLimiter, upload.any(), async (req, res) => {
+/**
+ * Checked before multer runs, not after: a malformed key is decidable from the
+ * headers alone, and rejecting it later means the caller has already uploaded
+ * 150MB to be told its header was wrong.
+ */
+function validateIdempotencyHeader(req: Request, res: Response, next: NextFunction): void {
+  if (!readIdempotencyKey(req).ok) {
+    res.status(400).json({ error: IDEMPOTENCY_KEY_ERROR });
+    return;
+  }
+  next();
+}
+
+deliveriesRouter.post("/", uploadLimiter, limitUploadBytes, validateIdempotencyHeader, upload.any(), async (req, res) => {
+  const idempotency = readIdempotencyKey(req);
+  if (!idempotency.ok) {
+    return res.status(400).json({ error: IDEMPOTENCY_KEY_ERROR });
+  }
+
   const input = parseDeliveryInput(req, res);
   if (!input) return;
 
@@ -110,6 +131,24 @@ deliveriesRouter.post("/", uploadLimiter, upload.any(), async (req, res) => {
     }
   }
 
+  // Before a byte is written: a retry after a timeout is asking for the delivery
+  // it already created, not for a second one (docs/production-readiness.md P8).
+  if (idempotency.key) {
+    const existing = await findByIdempotencyKey(idempotency.key);
+    if (existing) {
+      if (!describesSameDelivery(existing, input, filesByLabel)) {
+        log.warn("delivery_create_key_reused", { deliveryId: existing.id });
+        return res.status(409).json({
+          error: "this idempotency-key already created a different delivery",
+          delivery_id: existing.id,
+        });
+      }
+
+      log.info("delivery_create_replayed", { deliveryId: existing.id });
+      return res.status(200).json(existing);
+    }
+  }
+
   // Ids are generated up front so files can be written before the transaction
   // and still land under their final package's key. If the transaction then
   // fails, the already-written files are cleaned up below.
@@ -128,6 +167,7 @@ deliveriesRouter.post("/", uploadLimiter, upload.any(), async (req, res) => {
         id: deliveryId,
         direction: input.direction,
         referenceNumber: input.referenceNumber.trim().toUpperCase(),
+        idempotencyKey: idempotency.key,
         createdBy: CURRENT_USER,
         packages: {
           create: written.map(({ packageId, label, storagePaths }) => ({
@@ -145,7 +185,7 @@ deliveriesRouter.post("/", uploadLimiter, upload.any(), async (req, res) => {
           })),
         },
       },
-      include: { packages: { include: { images: IMAGE_SELECT } } },
+      include: DELIVERY_WITH_PACKAGES,
     });
 
     res.status(201).json(delivery);
@@ -154,9 +194,70 @@ deliveriesRouter.post("/", uploadLimiter, upload.any(), async (req, res) => {
     await Promise.allSettled(
       written.flatMap(({ storagePaths }) => storagePaths.map((p) => storage.delete(p)))
     );
+
+    // Two identical submits in flight at once: the lookup above found nothing
+    // for either, and the database decided which one wins. The loser answers
+    // with the winner's delivery rather than an error — from the caller's side
+    // this is the same retry the lookup handles, it just arrived sooner.
+    if (idempotency.key && isUniqueViolationOn(error, "idempotencyKey")) {
+      const existing = await findByIdempotencyKey(idempotency.key);
+      if (existing && describesSameDelivery(existing, input, filesByLabel)) {
+        log.info("delivery_create_replayed", { deliveryId: existing.id, raced: true });
+        return res.status(200).json(existing);
+      }
+    }
+
     throw error;
   }
 });
+
+/** One shape for a delivery-with-packages, so a 201 and a replayed 200 agree on order. */
+const DELIVERY_WITH_PACKAGES = {
+  packages: { orderBy: { label: "asc" }, include: { images: IMAGE_SELECT } },
+} as const;
+
+function findByIdempotencyKey(idempotencyKey: string) {
+  return prisma.delivery.findUnique({
+    where: { idempotencyKey },
+    include: DELIVERY_WITH_PACKAGES,
+  });
+}
+
+type StoredDelivery = NonNullable<Awaited<ReturnType<typeof findByIdempotencyKey>>>;
+
+/**
+ * Whether a replay is asking for the delivery it originally sent.
+ *
+ * A key is deliberately kept across retries, which means it can outlive the
+ * draft it was minted for: the submit commits, the response is lost, and the
+ * employee adds the package they forgot before pressing send again. Replaying
+ * blindly would answer 200, navigate to the confirmation, and drop that package
+ * without a word. Nothing extra is stored to detect it — the delivery itself
+ * already records everything the request described.
+ */
+function describesSameDelivery(
+  stored: StoredDelivery,
+  input: { direction: Direction; referenceNumber: string },
+  filesByLabel: Map<number, Express.Multer.File[]>
+): boolean {
+  if (stored.direction !== input.direction) return false;
+  if (stored.referenceNumber !== input.referenceNumber.trim().toUpperCase()) return false;
+  if (stored.packages.length !== filesByLabel.size) return false;
+
+  return stored.packages.every((pkg) => {
+    const photos = filesByLabel.get(pkg.label);
+    return photos !== undefined && photos.length === pkg.images.length;
+  });
+}
+
+/** Prisma's unique-constraint error, when it names the field we care about. */
+function isUniqueViolationOn(error: unknown, field: string): boolean {
+  const candidate = error as { code?: unknown; meta?: { target?: unknown } };
+  if (candidate?.code !== "P2002") return false;
+
+  const target = candidate.meta?.target;
+  return Array.isArray(target) ? target.includes(field) : target === field;
+}
 
 deliveriesRouter.get("/", async (req, res) => {
   const { search, status, page } = req.query as {

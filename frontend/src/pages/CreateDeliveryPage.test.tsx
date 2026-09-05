@@ -91,6 +91,29 @@ describe("CreateDeliveryPage", () => {
     await waitFor(() => expect(screen.getByText("package 1 needs at least 4 photos")).toBeInTheDocument());
   });
 
+  // The failure this guards: a slow upload commits on the server and still
+  // fails on the way back. A fresh key on the retry would file the same
+  // physical boxes twice.
+  it("retries a failed submit under the same idempotency key", async () => {
+    const createSpy = vi
+      .spyOn(apiClient, "createDelivery")
+      .mockRejectedValue(new Error("הרשת נכשלה"));
+    const user = userEvent.setup();
+    renderPage();
+
+    await validateReferenceNumber(user);
+    await addPackage(user);
+
+    await user.click(submitButton());
+    await waitFor(() => expect(screen.getByText("הרשת נכשלה")).toBeInTheDocument());
+    await user.click(submitButton());
+    await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(2));
+
+    const [firstKey, secondKey] = createSpy.mock.calls.map((call) => call[3]);
+    expect(firstKey).toEqual(expect.any(String));
+    expect(secondKey).toBe(firstKey);
+  });
+
   it("hands the new delivery to the list so it can be pointed out there", async () => {
     vi.spyOn(apiClient, "createDelivery").mockResolvedValue({
       id: "d9",

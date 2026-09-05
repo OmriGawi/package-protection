@@ -103,7 +103,15 @@ export function validateReference(direction: Direction, referenceNumber: string)
  * The whole delivery goes up in one request — nothing is persisted before
  * Submit (DESIGN.md §3), so this is the first time the photos leave the browser.
  */
-export function createDelivery(direction: Direction, referenceNumber: string, packages: DraftPackage[]) {
+export function createDelivery(
+  direction: Direction,
+  referenceNumber: string,
+  packages: DraftPackage[],
+  // Identifies the submit *attempt*, not the request: a retry after a timeout
+  // sends the same key, and the server answers with the delivery it already
+  // created rather than creating a second one for the same boxes.
+  idempotencyKey: string
+) {
   const form = new FormData();
   form.append("direction", direction);
   form.append("reference_number", referenceNumber);
@@ -116,7 +124,11 @@ export function createDelivery(direction: Direction, referenceNumber: string, pa
   }
 
   // No Content-Type header: the browser sets it with the multipart boundary.
-  return request<DeliveryDetail>("/api/deliveries", { method: "POST", body: form });
+  return request<DeliveryDetail>("/api/deliveries", {
+    method: "POST",
+    headers: { "Idempotency-Key": idempotencyKey },
+    body: form,
+  });
 }
 
 /** Search, status filter and paging all happen server-side (DESIGN.md §4.3). */
