@@ -233,7 +233,7 @@ a broker is better if the platform already provides one.
 ### P10 — Startup recovery is unsafe with more than one instance
 
 **Today.** `recoverInterruptedChecks()` runs at boot and moves *every* package
-in `CHECKING` to `CHECK_FAILED`, and every `PENDING` check to `ERROR`.
+in `CHECKING` to `CHECK_FAILED`, and every `PENDING` check to `INTERRUPTED`.
 
 **Breaks when.** A second instance starts — a rolling deploy, a scale-up — and
 marks the first instance's in-flight checks as failed while they are still
