@@ -30,12 +30,15 @@ Two skills govern this, and they are not optional:
 ## Commands that must pass before anything is called done
 
 ```bash
-cd backend  && npm test && npm run typecheck
-cd frontend && npm test && npm run typecheck
+cd backend  && npm test && npm run typecheck && npm run lint
+cd frontend && npm test && npm run typecheck && npm run lint
 ```
 
 Both, every time. Vitest strips types without checking them, so a green suite
 can sit on a broken build — that has happened here.
+
+`lint` is oxlint, and a warning fails it (`--max-warnings=0`). Both packages are
+clean, so anything it prints is new.
 
 `npm run coverage` in either package prints a report. CI prints it too, on
 every run. It is reported, not enforced: no threshold gates a merge.

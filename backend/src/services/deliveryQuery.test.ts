@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "../lib/prisma";
 import { findDeliveryPage } from "./deliveryQuery";
-import type { Prisma, Verdict, WorkflowStatus } from "@prisma/client";
+import type { Verdict, WorkflowStatus } from "@prisma/client";
 
 // Every delivery this suite creates shares a reference prefix, so assertions
 // can scope to them and ignore whatever else the dev database holds.

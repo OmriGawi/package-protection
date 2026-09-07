@@ -16,38 +16,62 @@ export function DeliveryDetailsCard({
   onReferenceNumberChange: (referenceNumber: string) => void;
   onValidityChange: (valid: boolean) => void;
 }) {
-  const [refStatus, setRefStatus] = useState<RefStatus>("idle");
-  const [linkedPoNumber, setLinkedPoNumber] = useState<string | null>(null);
+  /**
+   * What was validated, and what came back. Tagged with the input it describes
+   * rather than reset when that input changes: clearing it from an effect meant
+   * a render showing the old reference's tick before the reset landed, and it
+   * is the same fact stored twice — the answer, and whether the answer is still
+   * about what is on screen.
+   */
+  const [result, setResult] = useState<{
+    key: string;
+    status: Exclude<RefStatus, "idle">;
+    linkedPoNumber: string | null;
+  } | null>(null);
+
+  const key = `${direction}:${referenceNumber.trim()}`;
+  const refStatus: RefStatus = result?.key === key ? result.status : "idle";
+  const linkedPoNumber = result?.key === key ? result.linkedPoNumber : null;
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Guards against a slow-to-resolve validation call landing after the input
-  // has already changed again — only the newest request may update state.
-  const latestRequestId = useRef(0);
+
+  // Written from an effect, not during render: the only readers are the timer
+  // and the awaited continuation below, both of which run after commit.
   const onValidityChangeRef = useRef(onValidityChange);
-  onValidityChangeRef.current = onValidityChange;
+  useEffect(() => {
+    onValidityChangeRef.current = onValidityChange;
+  }, [onValidityChange]);
 
   useEffect(() => {
-    setRefStatus("idle");
-    setLinkedPoNumber(null);
-    onValidityChangeRef.current(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const value = referenceNumber.trim();
     if (!value) return;
 
+    // One flag rather than a request counter. A counter only advanced when the
+    // *next* debounce fired, which left the 550ms after a keystroke uncovered:
+    // a call already in flight could resolve in that window and report a
+    // superseded reference as valid — the tick would be gone from the screen
+    // while the parent had just been told to enable Submit.
+    let superseded = false;
+
     debounceRef.current = setTimeout(async () => {
-      const requestId = ++latestRequestId.current;
-      setRefStatus("checking");
-      const result = await validateReference(direction, value);
-      if (requestId !== latestRequestId.current) return;
-      setRefStatus(result.valid ? "valid" : "invalid");
-      setLinkedPoNumber(result.linked_po_number ?? null);
-      onValidityChangeRef.current(result.valid);
+      setResult({ key, status: "checking", linkedPoNumber: null });
+      const validated = await validateReference(direction, value);
+      if (superseded) return;
+      setResult({
+        key,
+        status: validated.valid ? "valid" : "invalid",
+        linkedPoNumber: validated.linked_po_number ?? null,
+      });
+      onValidityChangeRef.current(validated.valid);
     }, 550);
 
     return () => {
+      superseded = true;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [referenceNumber, direction]);
+  }, [referenceNumber, direction, key]);
 
   return (
     <div className="card" style={{ padding: "26px 28px", height: "fit-content" }}>
@@ -58,7 +82,15 @@ export function DeliveryDetailsCard({
           <button
             key={value}
             type="button"
-            onClick={() => onDirectionChange(value)}
+            onClick={() => {
+              // Nothing changes when the active direction is clicked again, so
+              // React skips the re-render and the validation effect never runs
+              // — reporting invalid here would strand the form with a green
+              // tick on screen and Submit dead.
+              if (value === direction) return;
+              onValidityChange(false);
+              onDirectionChange(value);
+            }}
             className="px-6 py-2.5 text-sm font-semibold transition"
             style={
               direction === value
@@ -82,7 +114,12 @@ export function DeliveryDetailsCard({
           dir="ltr"
           placeholder={direction === "EXPORT" ? "SHP-88291" : "PO-88291"}
           value={referenceNumber}
-          onChange={(e) => onReferenceNumberChange(e.target.value)}
+          onChange={(e) => {
+            // Told here rather than from an effect watching the prop: this is
+            // the event that invalidated the previous answer.
+            onValidityChange(false);
+            onReferenceNumberChange(e.target.value);
+          }}
           autoComplete="off"
           autoCorrect="off"
           autoCapitalize="off"

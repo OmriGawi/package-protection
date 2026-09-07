@@ -21,3 +21,4 @@ backend/storage/
 # Coverage output
 coverage/
 coverage.log
+audit.log

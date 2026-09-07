@@ -38,8 +38,14 @@ export function toDraftPhoto(file: File): DraftPhoto {
 export function usePhotoDraft() {
   const [photos, setPhotos] = useState<DraftPhoto[]>([]);
 
+  // Written from an effect rather than during render: the unmount cleanup below
+  // is the only reader, and it runs after commit, so a render-time write bought
+  // nothing and is the pattern React warns about.
   const photosRef = useRef(photos);
-  photosRef.current = photos;
+  useEffect(() => {
+    photosRef.current = photos;
+  }, [photos]);
+
   useEffect(() => () => photosRef.current.forEach((p) => URL.revokeObjectURL(p.url)), []);
 
   function add(files: File[]) {

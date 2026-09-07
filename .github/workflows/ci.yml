@@ -61,6 +61,10 @@ jobs:
         run: npm test
         working-directory: backend
 
+      - if: '!cancelled()'
+        run: npm run lint
+        working-directory: backend
+
       # Vitest strips types without checking them, so a green suite can sit on
       # a broken build. That has happened here; the build is its own gate.
       - if: '!cancelled()'
@@ -77,6 +81,22 @@ jobs:
             echo "### Backend coverage"
             echo '```'
             sed -n '/Coverage summary/,/^=*$/p' coverage.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        working-directory: backend
+
+      # Reported, not enforced, for the same reason as coverage: a threshold set
+      # today mostly fires on transitive noise, and an advisory that matters is
+      # worth a person reading it rather than a red X nobody can act on.
+      - name: Audit
+        if: '!cancelled()'
+        continue-on-error: true
+        run: |
+          npm audit --audit-level=high 2>&1 | tee audit.log || true
+          {
+            echo "### Backend dependency audit"
+            echo '```'
+            tail -n 20 audit.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
         working-directory: backend
@@ -119,6 +139,21 @@ jobs:
             echo "### Frontend coverage"
             echo '```'
             sed -n '/Coverage summary/,/^=*$/p' coverage.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        working-directory: frontend
+      # Reported, not enforced, for the same reason as coverage: a threshold set
+      # today mostly fires on transitive noise, and an advisory that matters is
+      # worth a person reading it rather than a red X nobody can act on.
+      - name: Audit
+        if: '!cancelled()'
+        continue-on-error: true
+        run: |
+          npm audit --audit-level=high 2>&1 | tee audit.log || true
+          {
+            echo "### Frontend dependency audit"
+            echo '```'
+            tail -n 20 audit.log
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
         working-directory: frontend
