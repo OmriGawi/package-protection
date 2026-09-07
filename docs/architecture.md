@@ -255,5 +255,12 @@ refuses to start at all if the tamper-detection client is still the mock or
 `TAMPER_CHECK_OUTCOME` is set — a mocked verdict is indistinguishable from a
 real one after the fact, since `verdictSource` says `API` either way.
 
-Both packages run `npm test` and `npm run typecheck`. Run both — Vitest strips
-types without checking them, so a green suite can sit on a broken build.
+Both packages run `npm test`, `npm run typecheck` and `npm run lint`. Run all
+three — Vitest strips types without checking them, so a green suite can sit on a
+broken build, and lint treats a warning as failure, so the answer to "is it
+clean" is the exit code rather than a judgement about which warnings matter.
+
+CI runs the same three per package, plus the build, and reports coverage and
+`npm audit` into the run summary. Both reports are deliberately advisory: a
+threshold set at today's number mostly fires on noise, and an advisory worth
+acting on is worth a person reading.

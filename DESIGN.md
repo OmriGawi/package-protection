@@ -811,3 +811,19 @@ changelog entries.
   (§4.4.4), so refusing further retries would strand it, and how many attempts
   are affordable is a vendor-cost question nobody has answered
   (`docs/production-readiness.md` P12).
+- 2026-09-07: **Quality gates on both packages.** The backend had no linter at
+  all; it has oxlint now, and both packages fail on a warning rather than
+  printing one, since the three warnings this slice cleared had been sitting
+  there unnoticed. Two were the same thing — a ref written during render — and
+  the third was `DeliveryDetailsCard` resetting its validation state from an
+  effect whenever the reference changed, which meant a render still showing the
+  previous reference's tick before the reset landed. That one is now derived:
+  the result is tagged with the input it describes, so "is this answer still
+  about what is on screen" is computed rather than stored, and the parent is
+  told the reference went invalid by the event that invalidated it rather than
+  by an effect watching the prop. CI gained the backend lint step and an
+  `npm audit` report per package, reported and not enforced for the same reason
+  coverage is. The first audit run has something in it: `deepmerge-ts` reaches
+  the tree through the `prisma` CLI, which is a devDependency and not part of
+  what ships, and the offered fix is a downgrade to 6.12.0 — worth knowing, not
+  worth taking.

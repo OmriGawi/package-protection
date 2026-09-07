@@ -77,4 +77,50 @@ describe("DeliveryDetailsCard", () => {
     expect(screen.getByText("לא נמצא ב-ERP — בדקו את המספר")).toBeInTheDocument();
     expect(onValidityChange).toHaveBeenLastCalledWith(false);
   });
+
+  // Clicking the active direction changes nothing, so React skips the render
+  // and the validation effect never re-runs. Reporting invalid from the handler
+  // left a green tick on screen with Submit dead and no way back except
+  // retyping the reference.
+  it("keeps a validated reference valid when the active direction is clicked again", async () => {
+    vi.spyOn(apiClient, "validateReference").mockResolvedValue({ valid: true, linked_po_number: "PO-84213" });
+    const onValidityChange = vi.fn();
+    const user = userEvent.setup();
+    render(<Harness onValidityChange={onValidityChange} />);
+
+    await user.type(screen.getByPlaceholderText("SHP-88291"), "SHP-84213");
+    await waitFor(() => expect(screen.getByText("אומת מול ה-ERP")).toBeInTheDocument(), { timeout: 2000 });
+
+    await user.click(screen.getByRole("button", { name: "ייצוא" }));
+
+    expect(screen.getByText("אומת מול ה-ERP")).toBeInTheDocument();
+    expect(onValidityChange).toHaveBeenLastCalledWith(true);
+  });
+
+  // The window a request counter missed: a call already in flight resolving
+  // after the next keystroke. The tick was correctly absent from the screen
+  // while the parent had just been told the reference was valid, so Submit was
+  // live against something never validated.
+  it("does not report a superseded reference as valid", async () => {
+    let resolveFirst!: (value: apiClient.ValidateReferenceResult) => void;
+    const firstCall = new Promise<apiClient.ValidateReferenceResult>((resolve) => {
+      resolveFirst = resolve;
+    });
+    vi.spyOn(apiClient, "validateReference").mockImplementationOnce(() => firstCall);
+
+    const onValidityChange = vi.fn();
+    const user = userEvent.setup();
+    render(<Harness onValidityChange={onValidityChange} />);
+
+    const input = screen.getByPlaceholderText("SHP-88291");
+    await user.type(input, "SHP-1");
+    // Let the debounce fire, so the call is genuinely in flight.
+    await waitFor(() => expect(apiClient.validateReference).toHaveBeenCalledTimes(1), { timeout: 2000 });
+
+    await user.type(input, "2");
+    resolveFirst({ valid: true, linked_po_number: "PO-1" });
+
+    await waitFor(() => expect(onValidityChange).toHaveBeenLastCalledWith(false));
+    expect(screen.queryByText("אומת מול ה-ERP")).not.toBeInTheDocument();
+  });
 });
