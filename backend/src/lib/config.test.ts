@@ -96,6 +96,15 @@ describe("loadConfig", () => {
       .rateLimitEnabled).toBe(true);
   });
 
+  // A zero deadline expires on the next tick, so every check fails and the
+  // whole thing reads as a vendor outage rather than as the typo it is.
+  it("refuses a tamper-check timeout of zero", () => {
+    expect(() => loadConfig({ ...VALID, TAMPER_CHECK_TIMEOUT_MS: "0" })).toThrow(
+      /TAMPER_CHECK_TIMEOUT_MS/
+    );
+    expect(loadConfig({ ...VALID, TAMPER_CHECK_TIMEOUT_MS: "1500" }).tamperCheckTimeoutMs).toBe(1500);
+  });
+
   it("rejects a boolean that isn't one", () => {
     expect(() => loadConfig({ ...VALID, RATE_LIMIT_ENABLED: "yes please" })).toThrow(
       /RATE_LIMIT_ENABLED/

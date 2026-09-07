@@ -41,7 +41,7 @@ export interface TamperCheckResult {
  * client should touch this file and nothing else.
  */
 export interface TamperCheckClient {
-  check(input: TamperCheckInput): Promise<TamperCheckResult>;
+  check(input: TamperCheckInput, options: TamperCheckOptions): Promise<TamperCheckResult>;
 }
 
 /** Thrown when the call itself fails, as distinct from returning a verdict. */
@@ -50,6 +50,30 @@ export class TamperCheckCallError extends Error {
     super(message);
     this.name = "TamperCheckCallError";
   }
+}
+
+/**
+ * A call that ran out of time.
+ *
+ * A subclass rather than a flag, so it travels the same path as any other
+ * failed call — CHECK_FAILED, retry offered (§4.2) — while still being
+ * identifiable in the stored attempt and in a log search.
+ */
+export class TamperCheckTimeoutError extends TamperCheckCallError {
+  constructor(timeoutMs: number) {
+    super(`tamper-detection call exceeded ${timeoutMs}ms`);
+    this.name = "TamperCheckTimeoutError";
+  }
+}
+
+/** Everything a client is given beyond the images. */
+export interface TamperCheckOptions {
+  /**
+   * Aborted when the caller's deadline passes. A real HTTP client should pass
+   * it to fetch, so a hung call releases its socket instead of leaking one per
+   * timed-out check — the deadline is enforced by the caller either way.
+   */
+  signal: AbortSignal;
 }
 
 export type MockOutcome = Verdict | "CALL_FAILED";
@@ -124,8 +148,24 @@ export class MockTamperCheckClient implements TamperCheckClient {
     private readonly delayMs = 1800
   ) {}
 
-  async check(input: TamperCheckInput): Promise<TamperCheckResult> {
-    await new Promise((resolve) => setTimeout(resolve, this.delayMs));
+  async check(input: TamperCheckInput, options: TamperCheckOptions): Promise<TamperCheckResult> {
+    // Honours the signal so the stand-in behaves like a real client under a
+    // deadline: a test that pins a slow call can prove the abort arrives,
+    // rather than proving only that the caller stopped waiting.
+    await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        options.signal.removeEventListener("abort", onAbort);
+        resolve();
+      }, this.delayMs);
+
+      function onAbort() {
+        clearTimeout(timer);
+        reject(new TamperCheckCallError("tamper-detection call was aborted"));
+      }
+
+      if (options.signal.aborted) return onAbort();
+      options.signal.addEventListener("abort", onAbort, { once: true });
+    });
 
     const outcome = this.pickOutcome();
     if (outcome === "CALL_FAILED") {

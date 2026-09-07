@@ -798,3 +798,16 @@ changelog entries.
   ahead of validation. What is still open is the shape rather than the bounds —
   the delivery goes up as one request with no resume, and fixing that waits on
   the storage service's contract (`docs/production-readiness.md` P6, P7).
+- 2026-09-07: **A bounded tamper-detection call.** The call now has a deadline
+  (`TAMPER_CHECK_TIMEOUT_MS`, 30s until the vendor names a real one): the client
+  is handed an `AbortSignal` so a real implementation can drop its socket, and
+  the caller also races the deadline so the bound holds even if a client ignores
+  the signal. A timeout is recorded as a failed call rather than a verdict, so
+  it reaches the retry the UI already offers — before this, a call that hung
+  rather than failed left the package in `CHECKING`, which offers nothing, and
+  only a restart recovered it. The dashboard also shows how many attempts a
+  package has burned, from the second failure onward. Deliberately a count and
+  not a cap: a `CHECK_FAILED` package has no verdict for a manager to override
+  (§4.4.4), so refusing further retries would strand it, and how many attempts
+  are affordable is a vendor-cost question nobody has answered
+  (`docs/production-readiness.md` P12).

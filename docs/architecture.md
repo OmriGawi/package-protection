@@ -126,6 +126,19 @@ implementation replaces one file:
 | Photo storage | `lib/storage.ts` | Local disk, opaque `storagePath` | Internal storage service (§7) |
 | Tamper detection | `lib/tamperCheck.ts` | Stand-in behind `TamperCheckClient`, pinnable via `TAMPER_CHECK_OUTCOME` | Third-party API (§9) |
 
+Every call through the tamper seam is bounded by `TAMPER_CHECK_TIMEOUT_MS`, in
+two ways at once: the client is handed an `AbortSignal` so a real one can drop
+its socket, and the caller races the call against the deadline so the bound
+holds even for a client that ignores the signal. A timeout is recorded as a
+failed call, not as a verdict, so it lands on the retry path that already exists
+(DESIGN.md §4.2) instead of leaving the package in `CHECKING` with nothing
+offered.
+
+An attempt cut short by a restart is `INTERRUPTED` rather than `ERROR`: the call
+may well have reached the vendor and succeeded, and nobody will ever know, so
+counting it as a failed call would overstate how often the service fails. The
+dashboard's per-package attempt count reads `ERROR` only.
+
 `storagePath` is deliberately opaque to the rest of the system: nothing but the
 storage client interprets it, so swapping disk for a service changes no schema.
 
@@ -178,7 +191,7 @@ erDiagram
   TamperCheck {
     uuid id PK
     uuid packageId FK
-    enum status "PENDING | COMPLETE | ERROR"
+    enum status "PENDING | COMPLETE | ERROR | INTERRUPTED"
     enum verdict "null while pending or on error"
     float confidenceScore
     json rawResponse "stored verbatim"

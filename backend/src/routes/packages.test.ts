@@ -186,7 +186,10 @@ describe("recoverInterruptedChecks", () => {
     // CHECK_FAILED rather than stuck, so the existing retry button applies.
     expect(pkg.workflowStatus).toBe("CHECK_FAILED");
     const check = await prisma.tamperCheck.findFirstOrThrow({ where: { packageId } });
-    expect(check.status).toBe("ERROR");
+    // INTERRUPTED rather than ERROR: the call may have reached the vendor and
+    // succeeded, so counting it as a failed call would overstate how often the
+    // service actually fails.
+    expect(check.status).toBe("INTERRUPTED");
   });
 });
 

@@ -38,15 +38,16 @@ Four tiers, in the order they matter.
 
 | Tier | Meaning | Items |
 |---|---|---|
-| **Blocker** | Cannot serve real deliveries. Data loss, no accountability, or a state nothing can get out of. | P1–P4, P6, P7, P9–P11, P13 |
+| **Blocker** | Cannot serve real deliveries. Data loss, no accountability, or a state nothing can get out of. | P1–P4, P6, P7, P9, P10, P13 |
 | **Scale** | Correct on one instance with a few thousand rows; wrong beyond that. | P12, P14–P21 |
 | **Operate** | Runs, but nobody can tell when it stops running. | P24, P25 |
 | **Policy** | Not a code question. Someone in the business has to decide. | P26–P30 |
 
 Closed items keep their numbers rather than being renumbered, so a reference in
 a commit or a changelog entry stays valid: **P5, P22 and P23 were closed by the
-runtime-hardening slice and P8 by the upload-limits slice (both 2026-09-05)**;
-P3, P6, P16, P24 and P25 shrank to what is left of them.
+runtime-hardening slice, P8 by the upload-limits slice (both 2026-09-05) and
+P11 by the call-deadline slice (2026-09-07)**; P3, P6, P12, P16, P24 and P25
+shrank to what is left of them.
 
 The tiers are about *risk*, not effort. Several blockers are an afternoon each.
 
@@ -209,7 +210,12 @@ a `PENDING` row and deliberately does not await the call: the request returns
 202 and the client polls. The work lives in the Node process.
 
 **Breaks when.** Any restart — a deploy, a crash, a Tanzu rescheduling — during
-a check. A `SIGTERM` is now handled: the drain waits for in-flight checks before
+a check. A call that merely hangs is no longer one of these cases: it hits the
+deadline and lands in `CHECK_FAILED` with the retry offered (P11). One narrow
+path still ends in `CHECKING` until the next boot, deliberately: if the vendor
+answers and the write recording that verdict fails, the attempt stays `PENDING`
+rather than being relabelled a failed call, because rewriting it would throw
+away a real answer and send the retry back for something already said. A `SIGTERM` is now handled: the drain waits for in-flight checks before
 exiting (`src/index.ts`), so an orderly deploy no longer strands them. A crash
 or a `SIGKILL` still does, and `recoverInterruptedChecks()` remains the answer
 for that — it moves stranded packages to `CHECK_FAILED` so the existing retry
@@ -244,41 +250,27 @@ progress". This follows for free from P9's queue and is listed separately
 because it is the specific bug, and because it must be fixed *before* the first
 scale-up, not after.
 
-### P11 — The vendor call has no deadline
-
-**Today.** `runCheck` awaits `client.check(...)` with no timeout. The mock
-resolves after 1.8 s; a real HTTP client with no deadline can hang
-indefinitely.
-
-**Breaks when.** The vendor hangs rather than fails. The package sits in
-`CHECKING` forever — a state with no retry button, because retry is offered
-only from `CHECK_FAILED` (DESIGN.md §4.2). Recovery today requires a restart.
-
-**Open question.** DESIGN.md §9 already asks whether the API is synchronous or
-job-based and what its typical latency is. Add: what timeout does the vendor
-recommend, and does a timed-out call still consume quota or produce a result we
-could poll for later?
-
-**Once answered.** A per-call deadline with `AbortController`, a bounded retry
-policy with backoff, and a circuit breaker so a vendor outage does not turn
-every package and every manager's retry click into more load. If the API turns
-out to be job-based, the polling/webhook design replaces this item entirely.
-
 ### P12 — Retry semantics and cost are undefined
 
-**Today.** Each attempt creates a new `TamperCheck` row — deliberate, for the
-audit trail (DESIGN.md §3). Nothing limits how many attempts a package can
-accumulate.
+**Today.** Each attempt creates a `TamperCheck` row — deliberate, for the audit
+trail (DESIGN.md §3) — and a call that outruns `TAMPER_CHECK_TIMEOUT_MS` is
+recorded as a failed one. The dashboard shows how many attempts a package has
+burned once it is more than one, and the retry endpoint is rate limited (P25).
+Nothing caps attempts.
 
-**Breaks when.** The vendor charges per call, or rate-limits us, and a manager
-clicks retry in a loop against a service that is down.
+**Breaks when.** The vendor charges per call, or rate-limits us, and a package
+quietly accumulates attempts against a service that is down.
 
 **Open question.** DESIGN.md §9 covers rate limits, cost per call, and
-retry/idempotency semantics. Those answers land here.
+retry/idempotency semantics. Two more, from building the deadline: what timeout
+does the vendor recommend, and does a timed-out call still consume quota or
+leave a result we could poll for rather than re-running?
 
-**Once answered.** Cap attempts per package, rate-limit the retry endpoint, and
-— if the vendor supports an idempotency key — send one so a retried call after
-a timeout cannot be billed or evaluated twice.
+**Once answered.** Set the timeout from the vendor's own number rather than the
+current guess, and decide whether a cap is wanted. A cap needs a destination
+first: a `CHECK_FAILED` package has no verdict for a manager to override
+(§4.4.4), so refusing further retries today would leave it nowhere to go. That
+is why the count is surfaced rather than enforced.
 
 ---
 
