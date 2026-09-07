@@ -218,6 +218,23 @@ export function DashboardPage() {
                           >
                             {badge.text}
                           </span>
+                          {/* A package that has burned several calls is a
+                              different problem from one that failed once, and
+                              nothing else in the row says so. Shown from the
+                              second failure — the first is what the badge
+                              already means — and only while the package is
+                              still failing: the count outlives the failures, so
+                              on a package that eventually came back INTACT it
+                              would sit beside a green badge saying the
+                              opposite. */}
+                          {row.workflowStatus === "CHECK_FAILED" && row.failedAttempts > 1 && (
+                            <span
+                              className="mr-2 text-[11.5px] font-semibold"
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              {row.failedAttempts} ניסיונות
+                            </span>
+                          )}
                         </td>
                         <td className="px-6 py-4 text-[12.5px]" style={{ color: "var(--text-secondary)" }}>
                           {verdictSourceText(row)}

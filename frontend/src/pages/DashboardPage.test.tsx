@@ -17,6 +17,7 @@ function row(overrides: Partial<apiClient.PackageListItem> = {}): apiClient.Pack
     verdict: "OPENED",
     verdictSource: "API",
     needsManagerReview: true,
+    failedAttempts: 0,
     deliveryId: "d1",
     deliveryInternalNumber: 1042,
     deliveryReference: "SHP-88291",
@@ -238,5 +239,46 @@ describe("DashboardPage", () => {
     renderPage();
     await waitFor(() => expect(screen.getByText("לא נמצאו חבילות תואמות.")).toBeInTheDocument());
     expect(screen.queryByRole("button", { name: "הבא" })).not.toBeInTheDocument();
+  });
+});
+
+describe("repeated call failures", () => {
+  // The badge already says "failed"; what it cannot say is that this package
+  // has failed four times while others failed once.
+  it("shows how many attempts a package has burned", async () => {
+    vi.spyOn(apiClient, "listPackages").mockResolvedValue(
+      page([row({ workflowStatus: "CHECK_FAILED", verdict: null, needsManagerReview: false, failedAttempts: 4 })])
+    );
+
+    renderPage();
+
+    expect(await screen.findByText("4 ניסיונות")).toBeInTheDocument();
+  });
+
+  // The count outlives the failures it counts: two failures then a successful
+  // retry leaves the row green with the attempts still recorded, and "2
+  // ניסיונות" beside תקינה reads as the opposite of what it means.
+  it("says nothing once a retry has succeeded", async () => {
+    vi.spyOn(apiClient, "listPackages").mockResolvedValue(
+      page([row({ workflowStatus: "RECEIVED", verdict: "INTACT", needsManagerReview: false, failedAttempts: 2 })])
+    );
+
+    renderPage();
+
+    await screen.findByText("תקינה");
+    expect(screen.queryByText(/ניסיונות/)).not.toBeInTheDocument();
+  });
+
+  // One failure is what the badge means; annotating it would be noise on every
+  // failed row.
+  it("says nothing about a package that has failed once", async () => {
+    vi.spyOn(apiClient, "listPackages").mockResolvedValue(
+      page([row({ workflowStatus: "CHECK_FAILED", verdict: null, needsManagerReview: false, failedAttempts: 1 })])
+    );
+
+    renderPage();
+
+    await screen.findByText("שגיאה בבדיקה");
+    expect(screen.queryByText(/ניסיונות/)).not.toBeInTheDocument();
   });
 });

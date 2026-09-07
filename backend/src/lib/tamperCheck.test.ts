@@ -17,9 +17,12 @@ function clientReturning(outcome: MockOutcome) {
   return new MockTamperCheckClient(() => outcome, 0);
 }
 
+/** Every call takes a deadline now; most tests never reach it. */
+const open = { signal: new AbortController().signal };
+
 describe("MockTamperCheckClient", () => {
   it.each(["INTACT", "OPENED", "INCONCLUSIVE"] as const)("returns a %s verdict", async (verdict) => {
-    const result = await clientReturning(verdict).check(input);
+    const result = await clientReturning(verdict).check(input, open);
 
     expect(result.verdict).toBe(verdict);
     // The real API may or may not expose a score — we don't invent one (§3).
@@ -29,11 +32,11 @@ describe("MockTamperCheckClient", () => {
   it("rejects when the call itself fails, rather than returning a verdict", async () => {
     // CHECK_FAILED is an operational problem, not evidence about the package,
     // so it must not arrive as if it were a verdict.
-    await expect(clientReturning("CALL_FAILED").check(input)).rejects.toBeInstanceOf(TamperCheckCallError);
+    await expect(clientReturning("CALL_FAILED").check(input, open)).rejects.toBeInstanceOf(TamperCheckCallError);
   });
 
   it("reports what it compared, so the stored raw response isn't opaque", async () => {
-    const result = await clientReturning("INTACT").check(input);
+    const result = await clientReturning("INTACT").check(input, open);
 
     expect(result.raw).toMatchObject({ mock: true, comparedPreShip: 1, comparedPostReceive: 1 });
   });
@@ -43,7 +46,7 @@ describe("MockTamperCheckClient", () => {
 
     // Deliberate: the mock detects nothing, so it must not be read as evidence
     // that identical photos mean an untampered package.
-    const result = await clientReturning("OPENED").check(sameImages);
+    const result = await clientReturning("OPENED").check(sameImages, open);
 
     expect(result.verdict).toBe("OPENED");
   });
@@ -83,5 +86,29 @@ describe("TAMPER_CHECK_OUTCOME", () => {
     // A typo that quietly behaves like RANDOM looks exactly like it working.
     expect(forcedOutcome()).toBeNull();
     expect(warn).toHaveBeenCalledWith(expect.stringContaining("INTECT"));
+  });
+});
+
+describe("MockTamperCheckClient under a deadline", () => {
+  // A real client abandons its request when the signal fires; the stand-in
+  // behaves the same way, so a test of the deadline exercises both halves
+  // rather than only the caller's side of the race.
+  it("rejects as soon as the signal aborts", async () => {
+    const controller = new AbortController();
+    const slow = new MockTamperCheckClient(() => "INTACT", 5_000);
+
+    const call = slow.check(input, { signal: controller.signal });
+    controller.abort();
+
+    await expect(call).rejects.toBeInstanceOf(TamperCheckCallError);
+  });
+
+  it("rejects immediately when handed a signal that is already aborted", async () => {
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      new MockTamperCheckClient(() => "INTACT", 5_000).check(input, { signal: controller.signal })
+    ).rejects.toBeInstanceOf(TamperCheckCallError);
   });
 });

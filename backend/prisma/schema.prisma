@@ -95,6 +95,10 @@ enum CheckStatus {
   PENDING
   COMPLETE
   ERROR
+  // The process died mid-call. Distinct from ERROR because nobody knows what
+  // the vendor did — the call may well have succeeded — so counting it as a
+  // failed call would overstate how often the service actually fails.
+  INTERRUPTED
 }
 
 // One row per attempt at the tamper-detection call, so a retry after a failed

@@ -161,6 +161,8 @@ export interface PackageListItem {
   verdict: Verdict | null;
   verdictSource: "API" | "MANUAL" | null;
   needsManagerReview: boolean;
+  /** Attempts on this package that ended in a failed call, not a verdict. */
+  failedAttempts: number;
   deliveryId: string;
   deliveryInternalNumber: number;
   deliveryReference: string;

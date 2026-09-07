@@ -191,3 +191,42 @@ describe("dashboard stats (DESIGN.md §4.4.1)", () => {
     expect(stats.pending).toBe(verdicts.filter((p) => p.verdict === null).length);
   });
 });
+
+describe("failedAttempts", () => {
+  // A package that has burned several calls is a different problem from one
+  // that failed once, and nothing else on the row says so. Deliberately a
+  // count and not a cap: CHECK_FAILED has no verdict for a manager to override
+  // (§4.4.4), so blocking further retries would leave it nowhere to go.
+  it("counts the attempts that ended in a failed call", async () => {
+    const created = await delivery("attempts", [{ workflowStatus: "CHECK_FAILED" }]);
+    const { id: packageId } = await prisma.package.findFirstOrThrow({
+      where: { deliveryId: created.id },
+    });
+
+    await prisma.tamperCheck.createMany({
+      data: [
+        { packageId, status: "ERROR" },
+        { packageId, status: "ERROR" },
+        // None of these is a failed call: one is still running, one produced a
+        // verdict, and the last was cut off by a restart — the vendor may well
+        // have answered it.
+        { packageId, status: "PENDING" },
+        { packageId, status: "COMPLETE", verdict: "INTACT" },
+        { packageId, status: "INTERRUPTED" },
+      ],
+    });
+
+    const page = await findPackagePage({ search: `${TAG}-attempts`, page: 1 });
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0].failedAttempts).toBe(2);
+  });
+
+  it("reports zero for a package that has never failed a call", async () => {
+    await delivery("clean", [{ workflowStatus: "RECEIVED", verdict: "INTACT", verdictSource: "API" }]);
+
+    const page = await findPackagePage({ search: `${TAG}-clean`, page: 1 });
+
+    expect(page.items[0].failedAttempts).toBe(0);
+  });
+});

@@ -28,6 +28,8 @@ export interface Config {
   rateLimitEnabled: boolean;
   /** How long a shutdown waits for in-flight requests before forcing exit. */
   shutdownGraceMs: number;
+  /** How long one tamper-detection call may take before it counts as failed. */
+  tamperCheckTimeoutMs: number;
   /** Largest JSON body accepted. Uploads are multipart and bounded separately. */
   jsonBodyLimit: string;
 }
@@ -52,12 +54,14 @@ function parseInteger(
   name: string,
   raw: string | undefined,
   fallback: number,
-  problems: string[]
+  problems: string[],
+  min = 0
 ): number {
   if (raw === undefined || raw.trim() === "") return fallback;
   const value = Number(raw);
-  if (!Number.isInteger(value) || value < 0) {
-    problems.push(`${name} must be a non-negative integer (got "${raw}")`);
+  if (!Number.isInteger(value) || value < min) {
+    const bound = min === 0 ? "a non-negative integer" : `an integer of at least ${min}`;
+    problems.push(`${name} must be ${bound} (got "${raw}")`);
     return fallback;
   }
   return value;
@@ -162,6 +166,19 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // times, so a limit would turn into flakiness rather than protection.
     rateLimitEnabled: parseBoolean("RATE_LIMIT_ENABLED", env.RATE_LIMIT_ENABLED, nodeEnv !== "test", problems),
     shutdownGraceMs: parseInteger("SHUTDOWN_GRACE_MS", env.SHUTDOWN_GRACE_MS, 10_000, problems),
+    // A guess, and labelled as one: the real service's latency is an open
+    // question (DESIGN.md §9). It exists so a hung call cannot park a package
+    // in CHECKING forever, not because 30s is known to be right.
+    // At least 1ms: a zero deadline expires on the next tick, so every check
+    // fails and the whole thing reads as a total vendor outage rather than as
+    // the typo it is.
+    tamperCheckTimeoutMs: parseInteger(
+      "TAMPER_CHECK_TIMEOUT_MS",
+      env.TAMPER_CHECK_TIMEOUT_MS,
+      30_000,
+      problems,
+      1
+    ),
     jsonBodyLimit: parseByteLimit(env.JSON_BODY_LIMIT, "100kb", problems),
   };
 

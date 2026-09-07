@@ -30,6 +30,8 @@ export interface PackageListRow {
   verdict: string | null;
   verdictSource: string | null;
   needsManagerReview: boolean;
+  /** How many attempts on this package ended in a failed call (§4.2). */
+  failedAttempts: number;
   deliveryId: string;
   deliveryInternalNumber: number;
   deliveryReference: string;
@@ -104,8 +106,8 @@ function filterClause(filter: PackageFilterKey): Prisma.Sql {
   return Prisma.sql`AND p."verdict" = ${filter}::"Verdict" AND p."workflowStatus" <> 'CHECK_FAILED'`;
 }
 
-interface QueryRow extends Omit<PackageListRow, "deliveryInternalNumber"> {
-  deliveryInternalNumber: number;
+interface QueryRow extends Omit<PackageListRow, "failedAttempts"> {
+  failedAttempts: bigint;
 }
 
 /**
@@ -200,6 +202,16 @@ export async function findPackagePage({
         -- verdict yet makes "verdict IN (...)" NULL, not FALSE, and the row
         -- would carry null where the API promises a boolean.
         COALESCE((${NEEDS_REVIEW}), FALSE) AS "needsManagerReview",
+        -- A package that has burned several calls is a different problem from
+        -- one that failed once, and nothing else on this row says so. Not a
+        -- cap: a CHECK_FAILED package has no verdict for a manager to override
+        -- (§4.4.4), so refusing further retries would leave it with nowhere to
+        -- go. How many attempts are affordable is a vendor-cost question
+        -- (docs/production-readiness.md P12).
+        (
+          SELECT COUNT(*) FROM "TamperCheck" tc
+          WHERE tc."packageId" = p."id" AND tc."status" = 'ERROR'
+        ) AS "failedAttempts",
         d."id" AS "deliveryId",
         d."internalNumber" AS "deliveryInternalNumber",
         d."referenceNumber" AS "deliveryReference",
@@ -220,7 +232,11 @@ export async function findPackagePage({
   );
 
   return {
-    items: rows,
+    // COUNT() arrives as bigint, which JSON.stringify refuses to serialize.
+    items: rows.map(({ failedAttempts, ...row }) => ({
+      ...row,
+      failedAttempts: Number(failedAttempts),
+    })),
     stats,
     total: Number(totals[0].total),
     page,

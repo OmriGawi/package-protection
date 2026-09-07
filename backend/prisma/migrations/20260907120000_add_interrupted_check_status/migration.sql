@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "CheckStatus" ADD VALUE 'INTERRUPTED';
