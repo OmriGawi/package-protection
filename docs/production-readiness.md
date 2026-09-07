@@ -38,16 +38,16 @@ Four tiers, in the order they matter.
 
 | Tier | Meaning | Items |
 |---|---|---|
-| **Blocker** | Cannot serve real deliveries. Data loss, no accountability, or a state nothing can get out of. | P1–P4, P6, P7, P9, P10, P13 |
-| **Scale** | Correct on one instance with a few thousand rows; wrong beyond that. | P12, P14–P21 |
+| **Blocker** | Cannot serve real deliveries. Data loss, no accountability, or a state nothing can get out of. | P1–P4, P6, P7, P13 |
+| **Scale** | Correct on one instance with a few thousand rows; wrong beyond that. | P9, P12, P14–P21 |
 | **Operate** | Runs, but nobody can tell when it stops running. | P24, P25 |
 | **Policy** | Not a code question. Someone in the business has to decide. | P26–P30 |
 
 Closed items keep their numbers rather than being renumbered, so a reference in
 a commit or a changelog entry stays valid: **P5, P22 and P23 were closed by the
-runtime-hardening slice, P8 by the upload-limits slice (both 2026-09-05) and
-P11 by the call-deadline slice (2026-09-07)**; P3, P6, P12, P16, P24 and P25
-shrank to what is left of them.
+runtime-hardening slice, P8 by the upload-limits slice (both 2026-09-05), P11 by
+the call-deadline slice and P10 by the leased-checks slice (both 2026-09-07)**;
+P3, P6, P9, P12, P16, P24 and P25 shrank to what is left of them.
 
 The tiers are about *risk*, not effort. Several blockers are an afternoon each.
 
@@ -203,52 +203,31 @@ offline-first capture; poor-but-present wifi needs only retry with backoff.
 
 ## 3. The tamper-detection job — Blocker at more than one instance
 
-### P9 — The check runs in the web process and dies with it
+### P9 — There is still no worker, only leased work inside the web process
 
-**Today.** `startCheck` (`backend/src/services/tamperCheckService.ts`) creates
-a `PENDING` row and deliberately does not await the call: the request returns
-202 and the client polls. The work lives in the Node process.
+**Today.** A check runs in the web process, but no longer only there: each
+attempt is leased to the instance running it, and any instance will pick up an
+attempt whose lease has expired and finish it (`reclaimExpiredChecks`). A crash
+is recovered automatically instead of leaving an employee a package to retry by
+hand, and `recoveryAttempts` stops a check that kills its process from
+circulating forever.
 
-**Breaks when.** Any restart — a deploy, a crash, a Tanzu rescheduling — during
-a check. A call that merely hangs is no longer one of these cases: it hits the
-deadline and lands in `CHECK_FAILED` with the retry offered (P11). One narrow
-path still ends in `CHECKING` until the next boot, deliberately: if the vendor
-answers and the write recording that verdict fails, the attempt stays `PENDING`
-rather than being relabelled a failed call, because rewriting it would throw
-away a real answer and send the retry back for something already said. A `SIGTERM` is now handled: the drain waits for in-flight checks before
-exiting (`src/index.ts`), so an orderly deploy no longer strands them. A crash
-or a `SIGKILL` still does, and `recoverInterruptedChecks()` remains the answer
-for that — it moves stranded packages to `CHECK_FAILED` so the existing retry
-button reaches them, which is sound for one process.
+**Breaks when.** Nothing routine — the crash, the deploy and the hung call are
+all handled. What remains is the shape: checks compete for the same processes
+that serve requests, so a burst of them and a burst of traffic are the same
+resource, and there is no backoff, no priority and no dead-letter queue to
+inspect. At low volume that is invisible.
 
 **Open question.** How many instances does Tanzu run, and is that number under
-our control? Is there a Redis or a message broker already available on the
-platform, or is Postgres the only stateful thing we get?
+our control? Is a Redis or a message broker available, or is Postgres the only
+stateful thing we get? And what volume of checks per hour should this carry —
+the answer decides whether a separate worker is worth its deployment.
 
-**Once answered.** Move the check to a durable queue with an owned lease, retry
-with backoff, a maximum attempt count, and a dead-letter path. `pg-boss` on the
-Postgres we already have is the smallest step and needs no new infrastructure;
-a broker is better if the platform already provides one.
-
-### P10 — Startup recovery is unsafe with more than one instance
-
-**Today.** `recoverInterruptedChecks()` runs at boot and moves *every* package
-in `CHECKING` to `CHECK_FAILED`, and every `PENDING` check to `INTERRUPTED`.
-
-**Breaks when.** A second instance starts — a rolling deploy, a scale-up — and
-marks the first instance's in-flight checks as failed while they are still
-running. Those checks then complete and write a verdict onto a package the
-recovery already moved. The current code is correct at exactly one instance and
-silently wrong at two, which is the worst kind of wrong.
-
-**Open question.** Same as P9: instance count, and whether rolling deploys are
-the platform default.
-
-**Once answered.** Recovery becomes lease-based — reclaim only work whose lease
-expired, identified by timestamp and owner, never "everything currently in
-progress". This follows for free from P9's queue and is listed separately
-because it is the specific bug, and because it must be fixed *before* the first
-scale-up, not after.
+**Once answered.** If volume warrants it, move the leased work to a real queue
+(`pg-boss` on the existing Postgres is the smallest step; a broker if the
+platform already runs one) and run it in a worker process, so checks and
+requests stop sharing a process. The lease is the part that would carry over
+unchanged.
 
 ### P12 — Retry semantics and cost are undefined
 

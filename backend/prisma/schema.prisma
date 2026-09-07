@@ -120,6 +120,17 @@ model TamperCheck {
   requestedAt DateTime    @default(now()) @db.Timestamptz(3)
   completedAt DateTime?   @db.Timestamptz(3)
 
+  // Who is running this attempt, and until when. A check lives in a process,
+  // so without a lease the only way to find abandoned work was to treat every
+  // in-progress check as abandoned at boot — correct with one instance and
+  // wrong with two. Cleared on every terminal write: a finished attempt is
+  // nobody's to reclaim.
+  leaseOwner       String?
+  leaseExpiresAt   DateTime? @db.Timestamptz(3)
+  // Bounds reclaiming. A check that kills its process every time would
+  // otherwise be picked up forever.
+  recoveryAttempts Int       @default(0)
+
   // packageId: for the cascade when a Delivery is deleted, which would
   // otherwise scan the whole table per package, and for the audit-trail read
   // this row exists to make possible — nothing queries it that way yet.
@@ -129,6 +140,8 @@ model TamperCheck {
   // here that grows without bound.
   @@index([packageId])
   @@index([status])
+  // What the reclaim sweep scans.
+  @@index([status, leaseExpiresAt])
 }
 
 model PackageImage {

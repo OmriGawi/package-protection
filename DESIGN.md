@@ -827,3 +827,25 @@ changelog entries.
   the tree through the `prisma` CLI, which is a devDependency and not part of
   what ships, and the offered fix is a downgrade to 6.12.0 — worth knowing, not
   worth taking.
+- 2026-09-07: **A running check now has an owner.** Recovery used to be a
+  boot-time sweep that moved every package in `CHECKING` to `CHECK_FAILED`,
+  which is right with one instance — nothing else could be running a check —
+  and silently wrong with two: a starting instance declared a live check dead,
+  and the instance still running it then wrote a verdict onto a package already
+  marked failed. Each attempt is now leased to the process running it, with an
+  expiry; any instance picks up an attempt whose lease has run out and finishes
+  it, claiming the row with the owner it just read in the WHERE clause so two
+  sweeps cannot both win. A crash therefore recovers itself instead of leaving
+  an employee a package to retry by hand, and `recoveryAttempts` caps the
+  reclaiming so a check that takes its process down every time ends up in
+  `CHECK_FAILED` for a human rather than circulating. Deliberately a lease on
+  the existing `TamperCheck` row rather than a job queue: the row is already one
+  durable record per attempt (§3), a queue would add a second one free to
+  disagree with it, and the automatic retry a queue exists to provide is wanted
+  only for interrupted work — a *failed call* still waits for a human (§4.2).
+  A result is also written only by the instance that still holds the lease,
+  since a process paused past its own lease would otherwise wake with an answer
+  and bury a manager's override behind `verdictSource: "API"`. Verified by
+  killing a process mid-check and watching the next start finish the job, and by
+  starting a second instance mid-check and watching it leave the first alone
+  (`docs/production-readiness.md` P9, P10).

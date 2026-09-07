@@ -105,6 +105,19 @@ describe("loadConfig", () => {
     expect(loadConfig({ ...VALID, TAMPER_CHECK_TIMEOUT_MS: "1500" }).tamperCheckTimeoutMs).toBe(1500);
   });
 
+  // A lease shorter than the call it covers has a healthy process losing its
+  // own work mid-call — the same two-writers confusion the lease prevents.
+  it("refuses a lease shorter than the call it covers", () => {
+    expect(() =>
+      loadConfig({ ...VALID, TAMPER_CHECK_TIMEOUT_MS: "30000", CHECK_LEASE_MS: "10000" })
+    ).toThrow(/CHECK_LEASE_MS/);
+
+    expect(
+      loadConfig({ ...VALID, TAMPER_CHECK_TIMEOUT_MS: "30000", CHECK_LEASE_MS: "60000" })
+        .checkLeaseMs
+    ).toBe(60_000);
+  });
+
   it("rejects a boolean that isn't one", () => {
     expect(() => loadConfig({ ...VALID, RATE_LIMIT_ENABLED: "yes please" })).toThrow(
       /RATE_LIMIT_ENABLED/
