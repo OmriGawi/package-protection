@@ -139,6 +139,39 @@ may well have reached the vendor and succeeded, and nobody will ever know, so
 counting it as a failed call would overstate how often the service fails. The
 dashboard's per-package attempt count reads `ERROR` only.
 
+## Who owns a running check
+
+A check runs inside the web process, so the fact that it is running lives in
+that process's memory — and the database is where every other instance has to
+learn it. Each attempt is therefore *leased*: `TamperCheck` records which
+instance is running it (`leaseOwner`, a UUID minted per process) and until when
+(`leaseExpiresAt`). Terminal writes clear both, so a finished attempt belongs to
+nobody.
+
+Every instance periodically looks for `PENDING` attempts whose lease has
+expired, claims one with the owner and expiry it just read in the `WHERE`
+clause — the same "let the database arbitrate" move as `claimForCheck` — and
+re-runs it. A crash is therefore recovered automatically rather than surfacing
+to an employee as a package to retry by hand.
+
+This replaced a boot-time sweep that moved *every* package in `CHECKING` to
+`CHECK_FAILED`. That was correct with exactly one instance and silently wrong
+with two: a starting instance declared a running check dead, and the instance
+still running it then wrote a verdict onto a package already marked failed.
+`recoveryAttempts` bounds the reclaiming, so a check that takes its process down
+every time ends in `CHECK_FAILED` for a human rather than circulating forever.
+
+A result is written only by the instance that still holds the lease. A process
+paused past its lease — a throttled container, a long pause — wakes with an
+answer for a check somebody else has since finished and possibly a manager has
+ruled on, and writing it by id alone would bury that override.
+
+The one attempt that stays `PENDING` on purpose is the vendor answering while
+the write recording that verdict fails: relabelling it a failed call would put a
+wrong reason in the audit trail. Its lease expires like any other, so the sweep
+re-runs it and does ask the vendor again — the cost a human pressing retry used
+to pay, now automatic and bounded.
+
 `storagePath` is deliberately opaque to the rest of the system: nothing but the
 storage client interprets it, so swapping disk for a service changes no schema.
 
@@ -192,6 +225,8 @@ erDiagram
     uuid id PK
     uuid packageId FK
     enum status "PENDING | COMPLETE | ERROR | INTERRUPTED"
+    string leaseOwner "which process is running it"
+    timestamptz leaseExpiresAt "when anyone else may take it"
     enum verdict "null while pending or on error"
     float confidenceScore
     json rawResponse "stored verbatim"

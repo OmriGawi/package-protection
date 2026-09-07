@@ -30,6 +30,12 @@ export interface Config {
   shutdownGraceMs: number;
   /** How long one tamper-detection call may take before it counts as failed. */
   tamperCheckTimeoutMs: number;
+  /** How long a running check is owned by the process running it. */
+  checkLeaseMs: number;
+  /** How often to look for checks whose lease has expired. */
+  checkRecoveryIntervalMs: number;
+  /** Whether this process sweeps for abandoned checks at all. */
+  checkRecoveryEnabled: boolean;
   /** Largest JSON body accepted. Uploads are multipart and bounded separately. */
   jsonBodyLimit: string;
 }
@@ -179,8 +185,37 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       problems,
       1
     ),
+    checkLeaseMs: parseInteger("CHECK_LEASE_MS", env.CHECK_LEASE_MS, 120_000, problems, 1),
+    checkRecoveryIntervalMs: parseInteger(
+      "CHECK_RECOVERY_INTERVAL_MS",
+      env.CHECK_RECOVERY_INTERVAL_MS,
+      30_000,
+      problems,
+      1
+    ),
+    // Off under test for the same reason as rate limiting: a sweep firing
+    // mid-suite would race the fixtures the tests just built. The suite calls
+    // the sweep directly instead.
+    checkRecoveryEnabled: parseBoolean(
+      "CHECK_RECOVERY_ENABLED",
+      env.CHECK_RECOVERY_ENABLED,
+      nodeEnv !== "test",
+      problems
+    ),
     jsonBodyLimit: parseByteLimit(env.JSON_BODY_LIMIT, "100kb", problems),
   };
+
+  // Twice the call, not merely more than it: the lease starts when the attempt
+  // is created and the call is only part of what it covers — reading the
+  // package's images comes first, and acquiring a connection to do that can
+  // take seconds of its own. A lease that barely clears the call still lets a
+  // healthy process lose its own work mid-attempt, which is the
+  // two-writers-one-package confusion the lease exists to prevent.
+  if (config.checkLeaseMs < config.tamperCheckTimeoutMs * 2) {
+    problems.push(
+      `CHECK_LEASE_MS (${config.checkLeaseMs}) must be at least twice TAMPER_CHECK_TIMEOUT_MS (${config.tamperCheckTimeoutMs})`
+    );
+  }
 
   if (problems.length > 0) throw new ConfigError(problems);
   return config;

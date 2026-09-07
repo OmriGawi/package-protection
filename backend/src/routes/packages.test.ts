@@ -7,7 +7,7 @@ import {
   setTamperCheckClient,
   type MockOutcome,
 } from "../lib/tamperCheck";
-import { recoverInterruptedChecks } from "../services/tamperCheckService";
+import { reclaimExpiredChecks } from "../services/tamperCheckService";
 
 const PNG = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
@@ -173,23 +173,25 @@ describe("POST /api/packages/:id/tamper-check", () => {
   });
 });
 
-describe("recoverInterruptedChecks", () => {
-  it("frees a package stranded in CHECKING by a restart", async () => {
+describe("reclaiming an abandoned check", () => {
+  it("frees a package whose check died with its process", async () => {
     const packageId = await shippedPackage();
-    // A check that started but whose process died before it could resolve.
+    // A check that started, took its lease, and whose process then died.
     await prisma.package.update({ where: { id: packageId }, data: { workflowStatus: "CHECKING" } });
-    await prisma.tamperCheck.create({ data: { packageId, status: "PENDING" } });
+    await prisma.tamperCheck.create({
+      data: {
+        packageId,
+        status: "PENDING",
+        leaseOwner: "an-instance-that-is-gone",
+        leaseExpiresAt: new Date(Date.now() - 1_000),
+      },
+    });
 
-    await recoverInterruptedChecks();
+    await reclaimExpiredChecks(new MockTamperCheckClient(() => "INTACT", 0));
 
-    const pkg = await prisma.package.findUniqueOrThrow({ where: { id: packageId } });
-    // CHECK_FAILED rather than stuck, so the existing retry button applies.
-    expect(pkg.workflowStatus).toBe("CHECK_FAILED");
-    const check = await prisma.tamperCheck.findFirstOrThrow({ where: { packageId } });
-    // INTERRUPTED rather than ERROR: the call may have reached the vendor and
-    // succeeded, so counting it as a failed call would overstate how often the
-    // service actually fails.
-    expect(check.status).toBe("INTERRUPTED");
+    // Reclaimed and finished rather than handed to a human to press retry.
+    const pkg = await waitForStatus(packageId, ["RECEIVED"]);
+    expect(pkg.verdict).toBe("INTACT");
   });
 });
 

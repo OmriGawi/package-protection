@@ -1,7 +1,9 @@
-import type { WorkflowStatus } from "@prisma/client";
+import { Prisma, type WorkflowStatus } from "@prisma/client";
 import { log } from "../lib/logger";
 import { prisma } from "../lib/prisma";
 import { config } from "../lib/config";
+import { INSTANCE_ID } from "../lib/instance";
+import { isShuttingDown } from "../lib/lifecycle";
 import {
   TamperCheckTimeoutError,
   getTamperCheckClient,
@@ -28,6 +30,17 @@ export async function claimForCheck(
   });
   return count === 1;
 }
+
+/** A lease held by this process, expiring far enough out to cover the call. */
+function heldByThisProcess() {
+  return {
+    leaseOwner: INSTANCE_ID,
+    leaseExpiresAt: new Date(Date.now() + config.checkLeaseMs),
+  };
+}
+
+/** No owner: a finished attempt is nobody's to reclaim. */
+const RELEASED = { leaseOwner: null, leaseExpiresAt: null } as const;
 
 /** Puts a claimed package back, for when the work after the claim fails. */
 export async function releaseClaim(packageId: string, to: WorkflowStatus): Promise<void> {
@@ -77,7 +90,9 @@ export async function startCheck(
   packageId: string,
   client: TamperCheckClient = getTamperCheckClient()
 ): Promise<void> {
-  const check = await prisma.tamperCheck.create({ data: { packageId, status: "PENDING" } });
+  const check = await prisma.tamperCheck.create({
+    data: { packageId, status: "PENDING", ...heldByThisProcess() },
+  });
 
   // Left running: the request returns 202 and the client polls for the result.
   // runCheck records its own failures, so this catch is only for the unexpected
@@ -95,10 +110,11 @@ export async function startCheck(
  * Records an attempt that fell over *before* the call was made.
  *
  * Deliberately not used after a call returns. A failure while recording a
- * verdict leaves the attempt PENDING on purpose — the call itself succeeded, and
- * rewriting it as a failed one would throw away a real answer and send the retry
- * back to the vendor for something it has already said. That case stays with the
- * boot-time recovery, which now marks it INTERRUPTED rather than ERROR.
+ * verdict leaves the attempt PENDING on purpose: the call itself succeeded, and
+ * relabelling it a failed call would put a wrong reason in the audit trail for
+ * an answer the vendor did give. Its lease then expires like any other and the
+ * sweep re-runs it, which does ask the vendor again — the same cost a human
+ * pressing retry used to pay, now automatic and bounded by recoveryAttempts.
  *
  * Before the call there is no answer to protect, so leaving the package in
  * CHECKING — a state that offers no retry (DESIGN.md §4.2) — buys nothing.
@@ -114,6 +130,7 @@ async function failCheck(packageId: string, checkId: string, error: unknown): Pr
           status: "ERROR",
           rawResponse: { error: error instanceof Error ? error.message : String(error) },
           completedAt: new Date(),
+          ...RELEASED,
         },
       }),
       prisma.package.updateMany({
@@ -122,7 +139,8 @@ async function failCheck(packageId: string, checkId: string, error: unknown): Pr
       }),
     ]);
   } catch (recordingError) {
-    // Nothing left to try. The boot-time recovery is the backstop.
+    // Nothing left to try here. The row keeps its lease, so the sweep is the
+    // backstop.
     log.error("tamper_check_failure_unrecorded", { packageId, checkId, err: recordingError });
   }
 }
@@ -157,43 +175,73 @@ async function runCheck(packageId: string, checkId: string, client: TamperCheckC
   } catch (error) {
     // The call failed — an operational problem, not a verdict, so the package
     // gets CHECK_FAILED and keeps whatever verdict it had (§3, §4.2).
-    await prisma.$transaction([
-      prisma.tamperCheck.update({
-        where: { id: checkId },
-        data: {
-          status: "ERROR",
-          rawResponse: { error: error instanceof Error ? error.message : String(error) },
-          completedAt: new Date(),
-        },
-      }),
-      prisma.package.update({
-        where: { id: packageId },
-        data: { workflowStatus: "CHECK_FAILED" },
-      }),
-    ]);
+    await recordIfStillOurs(checkId, packageId, {
+      check: {
+        status: "ERROR",
+        rawResponse: { error: error instanceof Error ? error.message : String(error) },
+        completedAt: new Date(),
+        ...RELEASED,
+      },
+      package: { workflowStatus: "CHECK_FAILED" },
+    });
     return;
   }
 
-  await prisma.$transaction([
-    prisma.tamperCheck.update({
-      where: { id: checkId },
-      data: {
-        status: "COMPLETE",
-        verdict: result.verdict,
-        confidenceScore: result.confidenceScore,
-        rawResponse: result.raw as object,
-        completedAt: new Date(),
-      },
-    }),
-    prisma.package.update({
-      where: { id: packageId },
-      data: {
-        workflowStatus: "RECEIVED",
-        verdict: result.verdict,
-        verdictSource: "API",
-      },
-    }),
-  ]);
+  await recordIfStillOurs(checkId, packageId, {
+    check: {
+      status: "COMPLETE",
+      verdict: result.verdict,
+      confidenceScore: result.confidenceScore,
+      rawResponse: result.raw as object,
+      completedAt: new Date(),
+      ...RELEASED,
+    },
+    package: {
+      workflowStatus: "RECEIVED",
+      verdict: result.verdict,
+      verdictSource: "API",
+    },
+  });
+}
+
+/**
+ * Writes an attempt's outcome, but only if this process still owns it.
+ *
+ * The lease decides who *starts* work; this is what stops a superseded owner
+ * from finishing it. A process paused past its lease — a throttled container, a
+ * long stop-the-world pause — wakes with a result in hand for a check that has
+ * since been reclaimed, completed, and possibly ruled on by a manager. Writing
+ * it by id alone would overwrite that: `verdictSource: "API"` would bury a
+ * MANUAL override and the note behind it (§4.4.5), which is the "two writers,
+ * one package" outcome the lease exists to prevent.
+ *
+ * The package write is guarded on CHECKING for the same reason, and runs only
+ * once the check row is confirmed still ours.
+ */
+async function recordIfStillOurs(
+  checkId: string,
+  packageId: string,
+  outcome: {
+    check: Prisma.TamperCheckUpdateManyMutationInput;
+    package: Prisma.PackageUpdateManyMutationInput;
+  }
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.tamperCheck.updateMany({
+      where: { id: checkId, status: "PENDING", leaseOwner: INSTANCE_ID },
+      data: outcome.check,
+    });
+
+    if (count !== 1) {
+      log.warn("tamper_check_result_discarded", { packageId, checkId });
+      return;
+    }
+
+    await tx.package.updateMany({
+      where: { id: packageId, workflowStatus: "CHECKING" },
+      data: outcome.package,
+    });
+  });
 }
 
 /**
@@ -237,30 +285,135 @@ async function callWithDeadline(
   }
 }
 
+/** Reclaiming forever would be the right answer to the wrong problem. */
+const MAX_RECOVERY_ATTEMPTS = 3;
+
 /**
- * An in-process check can't survive a restart, so anything left mid-flight is
- * stranded in CHECKING forever. Recovering it to CHECK_FAILED puts it back in
- * reach of the retry button that already exists for failed calls, rather than
- * inventing a second recovery path.
+ * Picks up checks whose owner stopped running.
+ *
+ * This replaces a boot-time sweep that moved *every* package in CHECKING to
+ * CHECK_FAILED. That was right with one instance, where nothing else could be
+ * running a check, and silently wrong with two: a starting instance declared a
+ * live check dead, and the instance still running it then wrote a verdict onto
+ * a package already marked failed. Ownership is now explicit and expires, so
+ * "abandoned" is a fact about the lease rather than an assumption about the
+ * fleet.
+ *
+ * Each row is claimed with the owner and expiry it was read with in the WHERE
+ * clause, so two instances sweeping at the same moment cannot both win it — the
+ * same reason `claimForCheck` puts the status in its own WHERE.
+ *
+ * Returns how many were taken.
  */
-export async function recoverInterruptedChecks(): Promise<number> {
+export async function reclaimExpiredChecks(
+  client: TamperCheckClient = getTamperCheckClient()
+): Promise<number> {
   const now = new Date();
-  const { count } = await prisma.package.updateMany({
-    where: { workflowStatus: "CHECKING" },
-    data: { workflowStatus: "CHECK_FAILED" },
-  });
 
-  await prisma.tamperCheck.updateMany({
-    where: { status: "PENDING" },
-    data: {
-      // INTERRUPTED, not ERROR: the call may well have reached the vendor and
-      // succeeded, and nobody will ever know. Recording it as a failed call
-      // would inflate every count of how often the service actually fails.
-      status: "INTERRUPTED",
-      rawResponse: { error: "interrupted by a server restart" },
-      completedAt: now,
+  const expired = await prisma.tamperCheck.findMany({
+    where: {
+      status: "PENDING",
+      // NULL as well as past: a check already running when the lease columns
+      // were added has no owner recorded, and NULL is not less-than anything in
+      // SQL, so filtering on the date alone would hide exactly the rows the
+      // deleted boot sweep used to rescue.
+      OR: [{ leaseExpiresAt: { lt: now } }, { leaseExpiresAt: null }],
     },
+    select: { id: true, packageId: true, leaseOwner: true, leaseExpiresAt: true, recoveryAttempts: true },
+    // Oldest lease first, so the window is deterministic rather than whatever
+    // the planner happens to return.
+    orderBy: { leaseExpiresAt: { sort: "asc", nulls: "first" } },
+    take: 20,
   });
 
-  return count;
+  let reclaimed = 0;
+  for (const check of expired) {
+    // Checked per row, not once: a sweep can outlive the signal that started a
+    // shutdown, and work picked up after the drain took its snapshot would be
+    // killed at exit and stranded for a whole lease.
+    if (isShuttingDown()) break;
+    if (await reclaim(check, client)) reclaimed++;
+  }
+  return reclaimed;
+}
+
+async function reclaim(
+  check: {
+    id: string;
+    packageId: string;
+    leaseOwner: string | null;
+    leaseExpiresAt: Date | null;
+    recoveryAttempts: number;
+  },
+  client: TamperCheckClient
+): Promise<boolean> {
+  // Past the cap this is not work waiting to be finished, it is work that keeps
+  // taking its process down with it. CHECK_FAILED is where a human can act.
+  if (check.recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
+    const { count } = await prisma.tamperCheck.updateMany({
+      where: { id: check.id, status: "PENDING", leaseOwner: check.leaseOwner },
+      data: {
+        status: "INTERRUPTED",
+        rawResponse: { error: `abandoned after ${MAX_RECOVERY_ATTEMPTS} recovery attempts` },
+        completedAt: new Date(),
+        ...RELEASED,
+      },
+    });
+    if (count === 1) {
+      await releaseClaim(check.packageId, "CHECK_FAILED");
+      log.warn("tamper_check_given_up", {
+        packageId: check.packageId,
+        checkId: check.id,
+        recoveryAttempts: check.recoveryAttempts,
+      });
+    }
+    return false;
+  }
+
+  const { count } = await prisma.tamperCheck.updateMany({
+    where: {
+      id: check.id,
+      status: "PENDING",
+      leaseOwner: check.leaseOwner,
+      leaseExpiresAt: check.leaseExpiresAt,
+    },
+    data: { ...heldByThisProcess(), recoveryAttempts: { increment: 1 } },
+  });
+  if (count !== 1) return false;
+
+  // The package moved on while this row sat expired — a retry produced a
+  // newer attempt, say. Nothing to re-run; let the row go.
+  const pkg = await prisma.package.findUnique({ where: { id: check.packageId } });
+  if (pkg?.workflowStatus !== "CHECKING") {
+    await prisma.tamperCheck.updateMany({
+      where: { id: check.id, status: "PENDING" },
+      data: {
+        status: "INTERRUPTED",
+        rawResponse: { error: "package was no longer being checked" },
+        completedAt: new Date(),
+        ...RELEASED,
+      },
+    });
+    return false;
+  }
+
+  log.info("tamper_check_reclaimed", {
+    packageId: check.packageId,
+    checkId: check.id,
+    previousOwner: check.leaseOwner,
+    recoveryAttempts: check.recoveryAttempts + 1,
+  });
+
+  const running = runCheck(check.packageId, check.id, client)
+    .catch((error) =>
+      log.error("tamper_check_unexpected_failure", {
+        packageId: check.packageId,
+        checkId: check.id,
+        err: error,
+      })
+    )
+    .finally(() => inFlight.delete(running));
+
+  inFlight.add(running);
+  return true;
 }

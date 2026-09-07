@@ -8,7 +8,7 @@ import { MockTamperCheckClient, getTamperCheckClient } from "./lib/tamperCheck";
 import {
   awaitInFlightChecks,
   inFlightCheckCount,
-  recoverInterruptedChecks,
+  reclaimExpiredChecks,
 } from "./services/tamperCheckService";
 
 /**
@@ -38,6 +38,34 @@ function assertProductionReady(): void {
 }
 
 /**
+ * Looks for checks abandoned by a process that stopped running, now and then
+ * periodically.
+ *
+ * Every instance sweeps; the lease is what keeps them from taking each other's
+ * work. Returns a function that stops the sweep.
+ */
+function startCheckRecovery(): () => void {
+  if (!config.checkRecoveryEnabled) return () => {};
+
+  const sweep = async () => {
+    try {
+      const reclaimed = await reclaimExpiredChecks();
+      if (reclaimed > 0) log.info("abandoned_checks_reclaimed", { count: reclaimed });
+    } catch (error) {
+      log.error("check_recovery_failed", { err: error });
+    }
+  };
+
+  // Once at boot, so a single-instance restart recovers without waiting out a
+  // whole interval.
+  void sweep();
+
+  const timer = setInterval(sweep, config.checkRecoveryIntervalMs);
+  timer.unref();
+  return () => clearInterval(timer);
+}
+
+/**
  * Stops taking new work, lets what is in flight finish, then exits.
  *
  * Readiness starts failing immediately (`beginShutdown`) so the platform can
@@ -45,7 +73,7 @@ function assertProductionReady(): void {
  * accepted. Past the grace period the exit is forced: a request that has not
  * finished by then is not going to.
  */
-function shutdownOn(signal: NodeJS.Signals, server: Server): void {
+function shutdownOn(signal: NodeJS.Signals, server: Server, stopSweeping: () => void): void {
   process.on(signal, () => {
     // A second signal — Ctrl-C twice, or SIGINT after SIGTERM — would otherwise
     // re-enter, and server.close() on an already-closing server calls back
@@ -57,6 +85,9 @@ function shutdownOn(signal: NodeJS.Signals, server: Server): void {
 
     log.info("shutdown_started", { signal, graceMs: config.shutdownGraceMs });
     beginShutdown();
+    // Before the drain: taking on more abandoned work while shutting down would
+    // only strand it again.
+    stopSweeping();
 
     const deadline = Date.now() + config.shutdownGraceMs;
     const forced = setTimeout(() => {
@@ -94,24 +125,18 @@ function shutdownOn(signal: NodeJS.Signals, server: Server): void {
 async function start() {
   assertProductionReady();
 
-  // A check runs in this process, so a restart strands anything mid-flight in
-  // CHECKING. Recovery is best-effort though: if the database isn't up yet,
-  // that's a reason to log and still serve, not to refuse to start.
-  try {
-    const recovered = await recoverInterruptedChecks();
-    if (recovered > 0) {
-      log.info("interrupted_checks_recovered", { count: recovered });
-    }
-  } catch (error) {
-    log.error("interrupted_check_recovery_failed", { err: error });
-  }
+  // A check runs in this process, so one that died with its process is picked
+  // up here by whoever notices the expired lease. Best-effort: if the database
+  // isn't up yet, that's a reason to log and still serve, not to refuse to
+  // start.
+  const stopSweeping = startCheckRecovery();
 
   const server = app.listen(config.port, () => {
     log.info("server_listening", { port: config.port, nodeEnv: config.nodeEnv });
   });
 
-  shutdownOn("SIGTERM", server);
-  shutdownOn("SIGINT", server);
+  shutdownOn("SIGTERM", server, stopSweeping);
+  shutdownOn("SIGINT", server, stopSweeping);
 }
 
 start().catch((error) => {
