@@ -26,6 +26,15 @@ describe("LocalDiskStorage", () => {
     expect(await store.read(second)).toEqual(Buffer.from("b"));
   });
 
+  // A key is written on one machine and read on another, so it cannot carry
+  // the writing host's separator. Only a Windows runner can fail this.
+  it("returns a \"/\"-separated key", async () => {
+    const storagePath = await store.save(Buffer.from("x"), ".jpg", "d/p");
+
+    expect(storagePath).not.toContain("\\");
+    expect(storagePath.split("/")).toHaveLength(3);
+  });
+
   it("deletes a file", async () => {
     const storagePath = await store.save(Buffer.from("temp"), ".png", "d/p");
     await store.delete(storagePath);
@@ -36,6 +45,15 @@ describe("LocalDiskStorage", () => {
   it("refuses a storagePath that escapes the storage root", async () => {
     await expect(store.read("../../../etc/passwd")).rejects.toThrow(/escapes the storage root/);
   });
+
+  // Keys are server-generated, so anything not shaped like one is rejected
+  // rather than resolved to whichever file it happens to land on.
+  it.each(["/etc/passwd", "//server/share", "a/../../b", "d/./p", "", "d\\p\\x.jpg"])(
+    "refuses the malformed storagePath %j",
+    async (storagePath) => {
+      await expect(store.read(storagePath)).rejects.toThrow(/escapes the storage root/);
+    }
+  );
 });
 
 afterAll(async () => {

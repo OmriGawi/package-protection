@@ -8,18 +8,24 @@ import { config } from "./config";
 // interface deals in opaque storagePath strings, so swapping the transport
 // later is a one-file change.
 export interface StorageClient {
-  /** `extension` includes the dot, and comes from the validated mime type — never from the uploaded filename. */
+  /** `extension` includes the dot, and comes from the validated mime type — never from the uploaded filename. `keyPrefix` is "/"-separated. */
   save(buffer: Buffer, extension: string, keyPrefix: string): Promise<string>;
   read(storagePath: string): Promise<Buffer>;
   delete(storagePath: string): Promise<void>;
 }
 
 export class LocalDiskStorage implements StorageClient {
-  constructor(private readonly rootDir: string) {}
+  private readonly rootDir: string;
+
+  constructor(rootDir: string) {
+    // Resolved once, because containment below is a string prefix comparison.
+    this.rootDir = path.resolve(rootDir);
+  }
 
   async save(buffer: Buffer, extension: string, keyPrefix: string): Promise<string> {
-    // Relative, so the stored path stays valid if the root directory moves.
-    const storagePath = path.join(keyPrefix, `${randomUUID()}${extension}`);
+    // Relative, so the stored path stays valid if the root directory moves, and
+    // POSIX-separated so a key written on Windows still resolves on Linux.
+    const storagePath = path.posix.join(keyPrefix, `${randomUUID()}${extension}`);
     const absolutePath = this.resolve(storagePath);
 
     await fs.mkdir(path.dirname(absolutePath), { recursive: true });
@@ -37,10 +43,16 @@ export class LocalDiskStorage implements StorageClient {
   }
 
   private resolve(storagePath: string): string {
-    const absolutePath = path.resolve(this.rootDir, storagePath);
-    // A storagePath comes out of our own database, but resolving it blindly
-    // would still turn a stray "../" into a read of anything on disk.
-    if (absolutePath !== this.rootDir && !absolutePath.startsWith(this.rootDir + path.sep)) {
+    const segments = storagePath.split("/");
+    // A storagePath comes out of our own database, so it is always relative,
+    // "/"-separated and free of traversal. Anything else is corrupt or hostile,
+    // and saying so beats resolving it to some file that happens to exist.
+    if (segments.some((segment) => segment === "" || segment === "." || segment === ".." || segment.includes("\\"))) {
+      throw new Error("storagePath escapes the storage root");
+    }
+
+    const absolutePath = path.resolve(this.rootDir, ...segments);
+    if (!absolutePath.startsWith(this.rootDir + path.sep)) {
       throw new Error("storagePath escapes the storage root");
     }
     return absolutePath;
