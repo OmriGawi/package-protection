@@ -92,7 +92,6 @@ for how work is organised here.
 backend/     Express 5 + Prisma + PostgreSQL  (routes → services → lib)
 frontend/    React 19 + Vite + React Router
 docs/        Architecture, user flows, production readiness
-ui/          Standalone HTML mockup — not the production frontend
 ```
 
 ## Where things are written down

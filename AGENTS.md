@@ -125,7 +125,6 @@ change one server-side and you must change it here.
 | `backend/prisma/migrations/*` (existing) | Already applied. Never edit one — write a new migration. |
 | `backend/prisma/client` / generated Prisma output | Regenerated from the schema. |
 | `package-lock.json` | Changed by npm, not by hand. |
-| `ui/index.html` | A standalone mockup, not the production frontend. Don't wire it into the build. |
 | `DESIGN.md` §11 changelog (existing entries) | A historical record. Add entries; never rewrite past ones. |
 
 ## The stand-ins
