@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run build"
   },
   "dependencies": {
     "react": "^19.2.8",
@@ -31,5 +32,8 @@
     "typescript": "~6.0.2",
     "vite": "^8.2.2",
     "vitest": "^5.0.0"
+  },
+  "engines": {
+    "node": ">=24"
   }
 }
