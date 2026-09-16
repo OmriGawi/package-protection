@@ -14,14 +14,29 @@ cd backend  && cp .env.example .env && npm ci && npx prisma migrate deploy
 cd frontend && cp .env.example .env && npm ci
 ```
 
-Two ways to get a database, and they coexist. Locally, `docker compose up -d`
-is the whole story. Against the cluster, Postgres runs there and you reach it
-with `kubectl port-forward` (or OpenLens) using credentials held in a cluster
-Secret — get them from the cluster, never from a file in this repo, and never
-commit them. `.env` is gitignored and stays that way.
+Two ways to get a database. Locally, `docker compose up -d` is the whole story.
+Where Docker is blocked — which it is on the company laptops — Postgres runs on
+the Kubernetes cluster and you reach it with `kubectl port-forward` (or
+OpenLens) using credentials from a cluster Secret. Get them from the cluster,
+never from a file in this repo, and never commit them; `.env` is gitignored and
+stays that way. The port-forward has to stay running: without it the app starts
+but `GET /ready` returns 503, which reads like a broken app if you have
+forgotten the tunnel.
 
-CI is unaffected either way: the workflow starts its own throwaway Postgres
-service container, which remains the source of truth for whether the suite
+`npm run setup` in `backend/` runs the migrations and then seeds development
+data — four deliveries covering the states the screens are built around. It is
+re-runnable: the seed replaces only the rows it created, which are the ones
+whose reference number contains `SEED`.
+
+**If your Postgres is shared, give the tests their own.** The suite writes to
+whatever `DATABASE_URL` names, so on a cluster database that means your
+development data. Copy `backend/.env.test.example` to `.env.test` and point it
+at a separate database, or a separate schema in the same one — vitest loads it
+ahead of `.env`, so the separation is a file rather than a habit. With a
+throwaway container you don't need the file at all.
+
+CI is unaffected either way: the workflow starts its own Postgres service
+container, which remains the impartial source of truth for whether the suite
 passes.
 
 `backend/.env.example` documents every variable `src/lib/config.ts` reads,

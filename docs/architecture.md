@@ -47,7 +47,6 @@ frontend/
   src/components/          Reused across pages
   src/lib/                 Display formatting, hooks, label rules
 docs/                      This folder
-ui/index.html              Standalone mockup — not the production frontend
 ```
 
 The `routes → services → lib` split is the one structural rule on the backend:

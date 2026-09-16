@@ -406,11 +406,12 @@ layout, API surface, request lifecycle, data model and seams; `user-flows.md`
 for the screens and state machines. This file stays the source of truth for
 what is being built and why.
 
-**UI prototyping note**: `ui/index.html` is a standalone Tailwind-CDN + vanilla-JS
-mockup — not the production frontend. It exists to iterate on layout/flow/RTL
-Hebrew copy quickly, opened directly as a file rather than through a build.
-The real frontend is still React per above; screens get rebuilt there once a
-screen's design is settled here.
+**UI prototyping note**: layout, flow and RTL Hebrew copy were iterated in a
+standalone Tailwind-CDN mockup (`ui/index.html`) opened as a file rather than
+through a build, and each screen was rebuilt in React once its design settled.
+Removed 2026-09-16, along with `ui/user-flow.html` and `ui/open-questions.html`:
+all four screens exist in React now (§4.1–§4.4), so the mockup could only
+disagree with them. The flows it illustrated live in `docs/user-flows.md`.
 
 ## 9. Open Questions
 
@@ -473,7 +474,8 @@ Early clickable wireframes covering the Create Delivery → Add Package flow,
 Delivery Detail, Receive Photos, and the Inventory Manager Dashboard — fully
 superseded by the real mockup (`ui/index.html`, §8) and removed
 (2026-09-04), source and all; the hosted link was already taken down
-earlier the same day. Kept only as a historical note here: several of their
+earlier the same day. The mockup that replaced them is itself gone as of
+2026-09-16, once every screen existed in React. Kept only as a historical note here: several of their
 concepts (the Dashboard's one-directional override, in particular) were
 deliberately changed once actually built — see §4.4 and the 2026-09-04
 changelog entries.
@@ -902,3 +904,47 @@ changelog entries.
   declared before although CI had always used it; `.editorconfig`; and
   `private: true` with `license: UNLICENSED` on the backend package, which was
   still carrying npm's default `ISC` and could have been published by accident.
+- 2026-09-16: **A fresh clone now has a database it can reach and data to look
+  at.** `npm run setup` migrates and then seeds four deliveries covering the
+  states the screens are built around — in transit, checked and intact, opened,
+  a manager's override with its note, and a failed call waiting for a human —
+  with real photos, so the galleries are populated rather than empty frames.
+  The seed is re-runnable because it owns its rows: every seeded reference
+  number contains `SEED`, and a re-run deletes those and their stored files
+  before writing new ones. Photos are generated as solid-colour PNGs by
+  `lib/solidPng.ts` rather than kept as a checked-in base64 blob, because bytes
+  nobody can read are bytes nobody can review.
+
+  The occasion was finding out that Docker is blocked on the company laptops,
+  so the only Postgres available there is one on the Kubernetes cluster reached
+  by port-forward, shared rather than throwaway. That makes a habit dangerous
+  that was previously merely untidy: the suite writes to whatever
+  `DATABASE_URL` names, and there was no separate test database — so running it
+  would have meant running it against the same rows being used for development.
+  `vitest.config.ts` now loads `backend/.env.test` ahead of `.env` when the
+  file exists, making the separation a file instead of something to remember.
+  Where Postgres *is* a throwaway container, nothing changes and the file is
+  unnecessary. CI is untouched either way: it starts its own container and
+  stays the impartial answer to whether the suite passes.
+
+  `README.md` gained an environments table, because "a schema named after me"
+  and "the test environment" had started to sound like the same thing and are
+  not: the schema is a local-development convenience that exists only because
+  a laptop cannot run Docker, while the deployed environments take their
+  configuration from a ConfigMap and a Secret and never read a `.env` file at
+  all. Typechecking also now covers `prisma/`, which the seed runner lives in —
+  it was outside `tsconfig.json`'s `include`, which is exactly the gap that
+  once let a type error sit undetected across a whole slice.
+- 2026-09-16: **Removed the `ui/` mockup and `.nvmrc`.** All four screens now
+  exist in React (§4.1–§4.4), so `ui/index.html` had stopped being a place to
+  design and become a second, diverging description of screens that already
+  work — the failure mode §10's wireframes were removed for, one layer up.
+  `ui/user-flow.html` and `ui/open-questions.html` went with it: both are
+  covered by `docs/user-flows.md` and §9 respectively, in files that are
+  actually maintained. The live references in `AGENTS.md`, `README.md`,
+  `docs/architecture.md` and `frontend/README.md` went at the same time, since a
+  doc pointing at a deleted file is worse than one that never mentioned it.
+  `.nvmrc` went because it only does anything for someone running `nvm use`,
+  and `engines: ">=24"` in both packages already states the requirement in a
+  form npm enforces. `.editorconfig` stays: line endings are a real problem the
+  moment a second machine touches the repo, and it is the file that prevents it.

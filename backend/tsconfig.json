@@ -8,7 +8,6 @@
     "moduleResolution": "nodenext",
     "lib": ["ES2022"],
     "outDir": "dist",
-    "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -16,6 +15,7 @@
     "resolveJsonModule": true
   },
   // Everything under src, tests included, so the editor and `npm run
-  // typecheck` cover them. The build narrows this — see tsconfig.build.json.
-  "include": ["src"]
+  // typecheck` cover them — plus prisma/, so the seed runner is checked too.
+  // The build narrows this — see tsconfig.build.json.
+  "include": ["src", "prisma"]
 }

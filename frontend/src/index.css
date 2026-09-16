@@ -1,5 +1,6 @@
-/* Design tokens ported from ui/index.html — keep in sync with that mockup
-   until each screen has been fully rebuilt here (DESIGN.md §8). */
+/* Design tokens, originally ported from the ui/index.html mockup. That mockup
+   is gone now that every screen is built here (DESIGN.md §8), so these are the
+   definition rather than a copy of one — change them here. */
 :root {
   --bg: #f7fafc;
   --text: #000000e6;

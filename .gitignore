@@ -5,6 +5,7 @@ backend/storage/
 .env
 .env.*
 !.env.example
+!.env.test.example
 *.log
 .DS_Store
 .vscode/

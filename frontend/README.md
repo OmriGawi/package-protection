@@ -20,8 +20,5 @@ runtime.
 | `src/components/` | Reused across pages |
 | `src/lib/` | Display formatting, hooks, label rules |
 
-Screens are designed first in `../ui/index.html` — a standalone mockup, not
-part of this build — and rebuilt here once settled.
-
 See [../CONTRIBUTING.md](../CONTRIBUTING.md) for the gates and the workflow,
 and [../docs/user-flows.md](../docs/user-flows.md) for what each screen does.
