@@ -173,6 +173,8 @@ to pay, now automatic and bounded.
 
 `storagePath` is deliberately opaque to the rest of the system: nothing but the
 storage client interprets it, so swapping disk for a service changes no schema.
+It is always `/`-separated, whatever the host wrote it on, because the machine
+that stores a key is rarely the one that reads it back.
 
 ## Upload bounds
 

@@ -44,6 +44,48 @@ including which become required when `NODE_ENV=production`. Config is validated
 once at import and reports *every* problem rather than the first, so a
 misconfigured environment tells you everything wrong with it in one start.
 
+## The Windows workstation
+
+This project is developed from a Mac and from an external Windows box. Same
+repo, same code — only `.env` differs, and `.env` is gitignored, so neither
+machine's setup can break the other's.
+
+The Windows box has no Docker daemon. Its database is a shared CloudNativePG
+cluster reached through a port-forward, which has to stay running:
+
+```powershell
+$env:KUBECONFIG="$HOME\.kube\package-management-dev-user-kubeconfig.yaml"
+kubectl port-forward -n package-management svc/pg16-rw 5432:5432
+```
+
+The cluster's hostname resolves but never accepts a direct connection — the
+services are ClusterIP, so the port-forward is the only way in.
+
+Four things differ there, each of which has already cost an afternoon:
+
+- **`npm.cmd` / `npx.cmd`, not `npm` / `npx`.** PowerShell's execution policy
+  blocks the `.ps1` shims.
+- **`NODE_OPTIONS=--use-system-ca`.** A corporate proxy re-signs TLS, and
+  without it Prisma's engine download dies on `unable to get local issuer
+  certificate`.
+- **`sslmode=disable` in the connection string.** The server's certificate is
+  issued for `pg16-rw` and the tunnel presents it as `localhost`. The hop to
+  the Kubernetes API server is the encrypted one.
+- **The tests must not touch the default schema**, which is shared with DevOps.
+  This used to mean overriding `DATABASE_URL` in the shell before every run,
+  which works only as long as nobody forgets. It is now a file — copy
+  `backend/.env.test.example` to `backend/.env.test` and give it the test
+  schema:
+
+  ```
+  DATABASE_URL="postgresql://appuser:<pw>@localhost:5432/appdb?sslmode=disable&schema=test_omri"
+  ```
+
+  vitest loads it ahead of `.env`, so the suite lands in `test_omri` whether or
+  not anyone remembered. `npx.cmd prisma migrate deploy` once with that URL to
+  create the tables in it.
+
+
 ## The gates
 
 ```bash

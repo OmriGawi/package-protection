@@ -851,6 +851,24 @@ changelog entries.
   killing a process mid-check and watching the next start finish the job, and by
   starting a second instance mid-check and watching it leave the first alone
   (`docs/production-readiness.md` P9, P10).
+- 2026-09-10: **A storage key is now the same string on every OS.**
+  `LocalDiskStorage.save` built the key it returns with `path.join`, so a photo
+  uploaded from a Windows machine was recorded in `PackageImage.storagePath` as
+  `delivery\package\uuid.jpg`. That string is persisted and read back later,
+  possibly from a Linux container, where those backslashes are not separators
+  but part of one long filename — the photo would have been unreadable, and
+  nothing would have said so until someone opened the comparison view. Keys are
+  built with `path.posix.join` and translated back to native separators only at
+  the moment a file is actually touched, which is the only place the host's
+  convention is anyone's business. `resolve` now also rejects a key that isn't
+  shaped like one the app generates — absolute, empty, `.`/`..` or
+  backslash-bearing — before the containment check rather than after: those used
+  to be caught by accident as traversal, and once keys were split on `/` they
+  would instead have resolved to some arbitrary path *inside* the root and
+  failed later as a confusing "file not found". Found by the suite failing on
+  Windows, which is the second machine this project is now developed on; the
+  storage seam (§7) is still a stand-in for the internal storage service, but
+  the key format is the part of it that outlives the stand-in.
 - 2026-09-16: **The development process moved out of one vendor's tooling.**
   It used to live in `CLAUDE.md` and two skills under `.claude/skills/`, which
   exactly one assistant reads. It now lives in `CONTRIBUTING.md` (setup, the
