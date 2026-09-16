@@ -11,7 +11,9 @@
     "lint": "oxlint --max-warnings=0",
     "coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm run lint && npm test && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm test && npm run build",
+    "seed": "tsx prisma/seed.ts",
+    "setup": "prisma migrate deploy && npm run seed"
   },
   "keywords": [],
   "author": "",
@@ -43,5 +45,8 @@
   "private": true,
   "engines": {
     "node": ">=24"
+  },
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
   }
 }

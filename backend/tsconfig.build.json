@@ -1,7 +1,13 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Set here rather than in the base config, which also covers prisma/ for
+    // typechecking: with a rootDir of src, a file outside it is an error.
+    "rootDir": "src"
+  },
   // Tests are typechecked by the base config, but never emitted: compiling
   // them into dist/ ships test code, and the resulting .test.js files get
-  // picked up by the test runner as a duplicate, broken suite.
-  "exclude": ["**/*.test.ts"]
+  // picked up by the test runner as a duplicate, broken suite. prisma/ is
+  // development tooling and never ships.
+  "exclude": ["**/*.test.ts", "prisma"]
 }
