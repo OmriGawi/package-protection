@@ -11,12 +11,11 @@ backend/storage/
 .idea/
 .claude/settings.local.json
 
-# Skills installed by `npx skills add` (see skills-lock.json to restore).
-# Own skills stay tracked.
+# Assistant-installed skills are local tooling, not repo content. The process
+# they used to hold now lives in CONTRIBUTING.md and AGENTS.md, which every
+# agent and every human reads.
 .agents/
-.claude/skills/*
-!.claude/skills/dev-workflow
-!.claude/skills/git-conventions
+.claude/skills/
 
 # Coverage output
 coverage/

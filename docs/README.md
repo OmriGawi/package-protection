@@ -19,9 +19,10 @@ build step and no image files to regenerate.
 
 ## Keeping these current
 
-Documentation is step 6 of the `dev-workflow` skill, not an afterthought. A
-change that alters behavior updates DESIGN.md's changelog; a change that moves
-code, adds a route, or changes the data model updates `architecture.md`; a
-change to what a screen does updates `user-flows.md`. Most changes touch one of
+Documentation is step 6 of the workflow in
+[../CONTRIBUTING.md](../CONTRIBUTING.md), not an afterthought. A change that
+alters behavior updates DESIGN.md's changelog; a change that moves code, adds a
+route, or changes the data model updates `architecture.md`; a change to what a
+screen does updates `user-flows.md`. Most changes touch one of
 the three, some touch none — but the question gets asked before work is called
 done.
