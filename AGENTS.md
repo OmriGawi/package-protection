@@ -8,22 +8,63 @@ same rules. If you add a pointer for another tool, keep it a pointer.
 git conventions, and they apply to you unchanged. This file is what an agent
 needs on top of them.
 
+## Starting the project
+
+A fresh clone needs dependencies, a database, a schema and data — in that
+order. Dependencies and `.env` files are not in the repo.
+
+```bash
+cd backend  && npm ci && cp .env.example .env
+cd ../frontend && npm ci && cp .env.example .env
+```
+
+Then a database, by whichever route this machine allows:
+
+```bash
+# (a) local container — fastest, when Docker is available
+docker compose up -d
+
+# (b) Postgres on the Kubernetes cluster — when Docker is blocked, which it is
+#     on the company laptops. Leave this running in its own terminal.
+kubectl port-forward svc/<postgres-service> 5432:5432
+#     then put the cluster credentials in backend/.env as DATABASE_URL
+```
+
+```bash
+cd backend && npm run setup     # prisma migrate deploy, then seed
+```
+
+`npm run setup` is safe to re-run: the seed replaces only the rows it created,
+which are the deliveries whose reference number contains `SEED`.
+
+Now run it — two terminals:
+
+```bash
+cd backend  && npm run dev      # :4000
+cd frontend && npm run dev      # :5173
+```
+
+If the database is unreachable, the backend still starts and `GET /ready`
+returns 503. Check the port-forward before assuming the app is broken.
+
 ## Commands
 
 ```bash
-docker compose up -d                  # Postgres — the backend suite needs it
+cd backend  && npm run verify   # typecheck, lint, test, build
+cd frontend && npm run verify   # same
 
-cd backend  && npm run verify         # typecheck, lint, test, build
-cd frontend && npm run verify         # same
-
-cd backend  && npm run dev            # :4000
-cd frontend && npm run dev            # :5173
+cd backend  && npm run seed     # reset the development data
 cd backend  && npx prisma migrate dev --name <change>   # after a schema edit
 ```
 
 `npm run verify` in **both** packages is the bar for calling work done — not
 one of them, and not only the package you think you touched. Vitest strips
 types without checking them, so a green suite can sit on a broken build.
+
+The suite writes to whatever `DATABASE_URL` names. Where Postgres is shared
+rather than a throwaway container, `backend/.env.test` points the tests at
+their own database or schema — see `backend/.env.test.example`. Never run the
+suite against a database someone else is reading.
 
 ## What this project is
 

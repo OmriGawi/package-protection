@@ -33,25 +33,48 @@ numbered item each, in [docs/production-readiness.md](docs/production-readiness.
 
 ## Quickstart
 
-Requires **Node 24** and Docker.
+Requires **Node 24** and a PostgreSQL 16 to talk to.
 
 ```bash
-docker compose up -d                  # Postgres 16
-
-cd backend
-cp .env.example .env
-npm ci
-npx prisma migrate deploy
-npm run dev                           # http://localhost:4000
-
-cd ../frontend
-cp .env.example .env
-npm ci
-npm run dev                           # http://localhost:5173
+cd backend  && npm ci && cp .env.example .env
+cd ../frontend && npm ci && cp .env.example .env
 ```
 
-Every environment variable the backend reads is documented in
-`backend/.env.example`, including which ones become required in production.
+Then a database, by whichever route the machine allows:
+
+```bash
+docker compose up -d                       # (a) local container
+kubectl port-forward svc/<postgres> 5432:5432   # (b) cluster Postgres, when
+                                           #     Docker is blocked — then put
+                                           #     the cluster credentials in
+                                           #     backend/.env
+```
+
+```bash
+cd backend  && npm run setup               # migrate, then seed development data
+cd backend  && npm run dev                 # http://localhost:4000
+cd frontend && npm run dev                 # http://localhost:5173
+```
+
+`npm run setup` is re-runnable; the seed replaces only its own rows. Every
+backend environment variable is documented in `backend/.env.example`, including
+which become required in production.
+
+## Environments
+
+The app reads all of its configuration from the environment, so the same image
+runs everywhere and only the values differ.
+
+| | Where it runs | Database | Config from |
+|---|---|---|---|
+| **Local development** | your machine, `npm run dev` | a local container, or a schema of your own on the cluster Postgres via port-forward | `backend/.env` |
+| **Tests** | your machine and CI | a throwaway container, a separate database, or a schema of its own — never the one holding your development data | `backend/.env.test` if present, else `.env`; CI passes it directly |
+| **Test / production** | pods in the cluster | the Postgres the platform team provisions per environment | a ConfigMap and a Secret — no `.env` file is involved |
+
+A schema named for you on a shared Postgres is a local-development
+convenience, not an environment: it exists because a company laptop cannot run
+Docker. Nothing deployed reads it, and nothing about it constrains how the real
+environments are configured.
 
 ## Before calling anything done
 
