@@ -849,3 +849,56 @@ changelog entries.
   killing a process mid-check and watching the next start finish the job, and by
   starting a second instance mid-check and watching it leave the first alone
   (`docs/production-readiness.md` P9, P10).
+- 2026-09-16: **The development process moved out of one vendor's tooling.**
+  It used to live in `CLAUDE.md` and two skills under `.claude/skills/`, which
+  exactly one assistant reads. It now lives in `CONTRIBUTING.md` (setup, the
+  gates and why each exists, the six-step loop, branch and commit rules) and
+  `AGENTS.md` (the same rules addressed to an agent), with a new root
+  `README.md` and a PR template prefilling the Summary/Test plan/Docs
+  checklist. `CLAUDE.md` and `.github/copilot-instructions.md` are now thin
+  pointers at `AGENTS.md`, which in turn points at `CONTRIBUTING.md` rather
+  than restating it: one copy of each rule, and any agent that reads a repo at
+  all finds it. The skills and `skills-lock.json` are deleted — their content
+  survived the move, minus the tool-specific parts (plan mode, the review-
+  comment format, the commit-message delegation). Two rules got *stronger* on
+  the way: the safety rules the old tool enforced ambiently (never force-push
+  `main`, never `--no-verify`) and the no-AI-attribution policy, which was a
+  silent setting, are both written down now. `frontend/README.md` was still
+  stock Vite template text.
+
+  The immediate reason was a change of assistant, but the durable one is that
+  a process enforced only by a tool is a process that leaves when the tool
+  does — and this repository is about to have other developers on it.
+- 2026-09-16: **The deployment target is a real Kubernetes cluster**, which
+  turned several theoretical items concrete. Recorded in `README.md`, for the
+  platform team: migrations run as their own Job, never at pod boot and never
+  as an initContainer, since that runs once per pod and replicas would race;
+  `VITE_API_URL` is inlined at build time, so one Ingress host serving both is
+  what makes the frontend image portable and closes P3 as a side effect;
+  `TRUST_PROXY` must be a hop count behind an Ingress or the whole deployment
+  shares one rate-limit bucket; `terminationGracePeriodSeconds` must exceed
+  `SHUTDOWN_GRACE_MS`, because the drain waits for running tamper checks and
+  not only for open sockets. P13 was revised rather than re-tiered: photos on
+  local disk was already a blocker, but it breaks on the first rolling deploy
+  rather than at scale, so the stop-gap until the storage service exists is one
+  replica with a PersistentVolumeClaim. Worth restating because it is easy to
+  read as a bug: `NODE_ENV=production` refuses to start while the tamper client
+  is the mock (§9), so a test cluster runs as `development` on purpose.
+- 2026-09-16: **Made the repo legible to any coding agent, not just a
+  well-briefed human.** `CLAUDE.md` now `@`-imports `AGENTS.md` rather than
+  linking to it: Claude Code does not read `AGENTS.md` natively, so a prose
+  pointer was a hope and the import is mechanical. `AGENTS.md` was rewritten
+  against what the published guidance actually finds effective — literal
+  commands instead of descriptions of commands, a table saying where new code
+  goes rather than a paragraph about layering, and an explicit *do not touch*
+  list (`.env`, applied migrations, generated Prisma output, `package-lock.json`,
+  `ui/index.html`, past changelog entries). It is 99 lines; the research
+  consensus is that these files stop paying for themselves past roughly 150.
+  Both packages gained `npm run verify` — typecheck, lint, test, build, cheapest
+  failure first — so "run the gates" is one command in every doc that mentions
+  it, rather than four that can be run partially. CI still runs the four steps
+  separately on purpose: it reports everything wrong in one go instead of
+  stopping at the first. Also `.nvmrc` and `engines: node >=24`, which nothing
+  declared before although CI had always used it; `.editorconfig`; and
+  `private: true` with `license: UNLICENSED` on the backend package, which was
+  still carrying npm's default `ISC` and could have been published by accident.

@@ -10,11 +10,12 @@
     "test": "vitest run",
     "lint": "oxlint --max-warnings=0",
     "coverage": "vitest run --coverage",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "verify": "npm run typecheck && npm run lint && npm test && npm run build"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "UNLICENSED",
   "type": "commonjs",
   "dependencies": {
     "@prisma/client": "^6.19.3",
@@ -38,5 +39,9 @@
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vitest": "^5.0.0"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=24"
   }
 }

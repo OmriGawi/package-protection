@@ -262,8 +262,15 @@ is why the count is surfaced rather than enforced.
 replacing this; the implementation is not shareable.
 
 **Breaks when.** A second instance serves an image the first one wrote, and
-returns 404. Also on every redeploy, if the container filesystem is ephemeral —
-which on Tanzu it generally is. Evidence would be lost on deploy.
+returns 404. Also on every redeploy, if the container filesystem is ephemeral.
+
+Confirmed 2026-09-16, when the target became a Kubernetes cluster: pods are
+ephemeral and replicas share no filesystem, so this is not a scaling problem
+that arrives later — it is broken on the first rolling deploy, and evidence
+photographed before that deploy is gone. Until the storage service exists, a
+deployment is therefore one replica with a PersistentVolumeClaim, or a test
+environment where losing the photos is acceptable. Neither is a production
+answer; both are honest stop-gaps.
 
 **Open question.** DESIGN.md §9's storage-service questions: the upload and
 retrieval contracts, what identifier comes back to store on `PackageImage`,
