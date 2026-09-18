@@ -3,15 +3,15 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: package_protector
-      POSTGRES_PASSWORD: package_protector
-      POSTGRES_DB: package_protector
+      POSTGRES_USER: package_protection
+      POSTGRES_PASSWORD: package_protection
+      POSTGRES_DB: package_protection
     ports:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U package_protector"]
+      test: ["CMD-SHELL", "pg_isready -U package_protection"]
       interval: 5s
       timeout: 5s
       retries: 5

@@ -19,7 +19,7 @@ export function AppHeader() {
         <div className="flex items-center gap-2">
           <Logo />
           <span className="font-extrabold text-[15px]" style={{ color: "var(--navy)" }}>
-            Package Protector
+            Package Protection
           </span>
         </div>
 

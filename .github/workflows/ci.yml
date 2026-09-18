@@ -21,19 +21,19 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: package_protector
-          POSTGRES_PASSWORD: package_protector
-          POSTGRES_DB: package_protector
+          POSTGRES_USER: package_protection
+          POSTGRES_PASSWORD: package_protection
+          POSTGRES_DB: package_protection
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U package_protector"
+          --health-cmd "pg_isready -U package_protection"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
 
     env:
-      DATABASE_URL: postgresql://package_protector:package_protector@localhost:5432/package_protector
+      DATABASE_URL: postgresql://package_protection:package_protection@localhost:5432/package_protection
       PORT: 4000
 
     steps:

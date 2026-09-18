@@ -1,4 +1,4 @@
-# Package Protector
+# Package Protection
 
 Photograph a package before it ships and again when it arrives, and have a
 tamper-detection API say whether it was opened in transit.

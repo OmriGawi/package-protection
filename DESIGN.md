@@ -1,4 +1,4 @@
-# Package Protector — Design Doc
+# Package Protection — Design Doc
 
 Living document, updated as we design. Decisions and open questions are both
 tracked here so nothing lives only in chat history.
@@ -966,3 +966,18 @@ changelog entries.
   and `engines: ">=24"` in both packages already states the requirement in a
   form npm enforces. `.editorconfig` stays: line endings are a real problem the
   moment a second machine touches the repo, and it is the file that prevents it.
+- 2026-09-18: **Renamed to Package Protection**, in all sixteen places the old
+  name appeared: the wordmark in `AppHeader`, the browser title, the two doc
+  titles, and the Postgres user, password and database name in
+  `docker-compose.yml`, CI and both `.env.example` files. The local volume had
+  to be recreated rather than renamed — `POSTGRES_DB` only applies to an empty
+  data directory, so a running database keeps whatever name it was born with —
+  which is worth knowing before anyone tries the same on a database that holds
+  something. Nothing in the running system depends on the name: no test
+  asserted it, and the Hebrew UI never carried it outside the header.
+
+  Deliberately unchanged: the cluster's `appdb` and the `package-management`
+  namespace on the Windows workstation. Those are DevOps's names, not ours, and
+  renaming our half to match a name we don't own would only invent a
+  disagreement. Git history keeps the old name in commit messages and paths,
+  which is correct — it is what the project was called at the time.
