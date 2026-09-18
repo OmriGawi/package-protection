@@ -981,3 +981,17 @@ changelog entries.
   renaming our half to match a name we don't own would only invent a
   disagreement. Git history keeps the old name in commit messages and paths,
   which is correct — it is what the project was called at the time.
+- 2026-09-18: **Seeded the inconclusive case, both halves.** `INCONCLUSIVE`
+  ("דורש בדיקה") has its own stat card, its own filter and the second-highest
+  rung of the dashboard's priority order — and the seed produced none of them,
+  so the manager's dashboard opened with a zero on the one state §2 names as
+  the reason the role exists. A fifth delivery now carries one waiting for a
+  manager and one a manager has been through: since the review panel only
+  resolves to `INTACT` or `OPENED`, the second is `OPENED` by `MANUAL`, which
+  is also the only seeded override that *agrees* with the API rather than
+  overturning it. That fills rungs 2 and 4, the two that had nothing in them.
+
+  The test that came with it asserts the priority ladder rung by rung rather
+  than asserting the new rows exist. A state added to `PRIORITY_CASE` without a
+  row to sit in it now fails a test instead of quietly rendering an empty
+  screen — which is the failure this entry is a record of.
