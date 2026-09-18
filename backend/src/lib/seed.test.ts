@@ -46,6 +46,22 @@ describe("seedDatabase", () => {
     expect(packages.some((p) => p.workflowStatus === "CHECK_FAILED")).toBe(true);
   });
 
+  it("fills every rung of the dashboard's priority order", async () => {
+    await seedDatabase();
+    const packages = (await seededDeliveries()).flatMap((d) => d.packages);
+    const unreviewed = (p: (typeof packages)[number]) =>
+      p.workflowStatus !== "CHECK_FAILED" && p.verdictSource !== "MANUAL";
+
+    // packageQuery.ts's PRIORITY_CASE, rung by rung. A rung with nothing in it
+    // is a screen nobody has seen with data in it.
+    expect(packages.some((p) => p.verdict === "OPENED" && unreviewed(p))).toBe(true); // 0
+    expect(packages.some((p) => p.workflowStatus === "CHECK_FAILED")).toBe(true); // 1
+    expect(packages.some((p) => p.verdict === "INCONCLUSIVE" && unreviewed(p))).toBe(true); // 2
+    expect(packages.some((p) => p.verdict === null)).toBe(true); // 3
+    expect(packages.some((p) => p.verdict === "OPENED" && p.verdictSource === "MANUAL")).toBe(true); // 4
+    expect(packages.some((p) => p.verdict === "INTACT")).toBe(true); // 5
+  });
+
   it("gives a package past shipping both sets of photos, and one still in transit only its first", async () => {
     await seedDatabase();
     const packages = (await seededDeliveries()).flatMap((d) => d.packages);

@@ -104,6 +104,39 @@ const DELIVERIES: DeliverySpec[] = [
     daysAgo: 9,
     packages: [{ label: 1, workflowStatus: "CHECK_FAILED", check: { status: "ERROR" } }],
   },
+  // The inconclusive case, both halves: one waiting for a manager, one a
+  // manager has been through. It is §2's whole reason for the role, and it has
+  // its own stat card, filter and priority rung — all of which read as empty
+  // until something lands in them.
+  {
+    reference: `SHP-${SEED_MARK}005`,
+    direction: "EXPORT",
+    daysAgo: 3,
+    packages: [
+      {
+        label: 1,
+        workflowStatus: "RECEIVED",
+        verdict: "INCONCLUSIVE",
+        verdictSource: "API",
+        check: { status: "COMPLETE", verdict: "INCONCLUSIVE" },
+      },
+      {
+        // A manager resolves to INTACT or OPENED — never back to INCONCLUSIVE
+        // (ManagerReviewPanel). This is what an inconclusive package looks like
+        // afterwards, and the only row whose override agrees with a suspicion
+        // rather than overturning it.
+        label: 2,
+        workflowStatus: "RECEIVED",
+        verdict: "OPENED",
+        verdictSource: "MANUAL",
+        check: { status: "COMPLETE", verdict: "INCONCLUSIVE" },
+        override: {
+          by: "inventory-manager",
+          note: "הצילומים לא איפשרו הכרעה. בבדיקה פיזית במחסן נמצא שסרט האריזה הוחלף וחסר פריט אחד מול תעודת המשלוח.",
+        },
+      },
+    ],
+  },
 ];
 
 export interface SeedResult {
