@@ -158,7 +158,15 @@ export function DeliveryPackagesPage() {
       {delivery && (
         <>
           <div className="mb-6">
-            <h1 className="text-2xl font-extrabold" style={{ color: "var(--navy)" }} dir="ltr">
+            {/* The reference is Latin text on an RTL page: dir="ltr" keeps
+                "SHP-5125" in ERP order, and the explicit right alignment stops
+                the heading from starting at the left edge, away from every
+                other line on the page. Same pair as the reference cell in the
+                deliveries and dashboard tables. */}
+            <h1
+              className="text-2xl font-extrabold"
+              style={{ color: "var(--navy)", direction: "ltr", textAlign: "right" }}
+            >
               {delivery.referenceNumber}
             </h1>
             <p className="mt-1.5 text-sm" style={{ color: "var(--text-secondary)" }}>

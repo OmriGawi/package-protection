@@ -995,3 +995,12 @@ changelog entries.
   than asserting the new rows exist. A state added to `PRIORITY_CASE` without a
   row to sit in it now fails a test instead of quietly rendering an empty
   screen — which is the failure this entry is a record of.
+- 2026-09-18: **The delivery reference now sits on the right of its own page.**
+  The heading on the delivery-packages screen (§4.4) carried `dir="ltr"` so the
+  ERP reference reads in its own order, but nothing else — and on an RTL page
+  `text-align: start` resolves to the left, which parked "SHP-5125" at the
+  opposite edge from every other line on the screen. It now pairs that with an
+  explicit right alignment, the same pair the reference cell in the deliveries
+  and dashboard tables has always used. Worth knowing for the next Latin string
+  that lands on one of these pages: `dir="ltr"` alone moves the text as well as
+  ordering it, and on a block element that is almost never what is wanted.
