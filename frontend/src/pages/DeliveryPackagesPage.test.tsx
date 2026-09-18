@@ -58,6 +58,17 @@ const imageFiles = (count: number) =>
   Array.from({ length: count }, (_, i) => new File(["x"], `r-${i}.png`, { type: "image/png" }));
 
 describe("DeliveryPackagesPage", () => {
+  it("keeps the reference heading on the right of the RTL page", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(delivery([pkg()]));
+
+    renderPage();
+
+    // dir=ltr alone resolves text-align: start to the left on an RTL page,
+    // which put the reference at the opposite edge from every other line.
+    const heading = await screen.findByRole("heading", { name: "SHP-84213" });
+    expect(heading).toHaveStyle({ direction: "ltr", textAlign: "right" });
+  });
+
   it("offers the receive-photos action only for a shipped package", async () => {
     vi.spyOn(apiClient, "getDelivery").mockResolvedValue(
       delivery([pkg(), pkg({ id: "p2", label: 2, workflowStatus: "RECEIVED", verdict: "INTACT" })])
