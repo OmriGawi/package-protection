@@ -4,7 +4,7 @@
 # Reads the hook payload on stdin, flattens every string in it (the Bash tool
 # response shape is not guaranteed), and reads Vitest's own output:
 #
-#        RUN  v5.0.0 /Users/…/package-protector/frontend   → which package
+#        RUN  v5.0.0 /Users/…/package-protection/frontend   → which package
 #   Test Files  6 passed (6)                               → how many files
 #        Tests  52 passed (52)                             → how many tests
 #        Tests  31 failed | 41 passed | 8 skipped (80)
