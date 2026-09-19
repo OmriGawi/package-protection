@@ -188,12 +188,66 @@ deliberately not reformatted to match.
 
 ## Pull requests
 
-- Title under ~70 characters.
+Every change reaches `main` through one, and `main` takes no other input —
+nothing is merged from a laptop. The pull request is what ties a commit to a
+review and to a green CI run; without it, neither is recoverable later.
+
+- Title under ~70 characters, in the same Conventional Commits form as a commit
+  subject. The squash merge turns it into one.
 - Body in plain prose: a short **Summary** in bullets, and a **Test plan**
   saying what was actually run — the gates, plus any manual browser check. The
   template prefills both.
 - Link the `DESIGN.md` section or production-readiness item the work relates
   to, where there is one.
+- Label it with its Conventional Commits type — `feat`, `fix`, `docs`, `chore`,
+  `ci`. The label is what files it under a heading in the release notes.
+- **Squash on merge**, always. One commit per pull request keeps `main` linear
+  and stamps the number onto the subject — `feat(frontend): right-align the
+  reference heading (#12)` — so every commit leads back to the review that
+  accepted it. The branch is the unit a reviewer reads, so keep branches small
+  enough that flattening one loses nothing worth keeping.
+
+```bash
+git switch -c feat/thing
+# ... the six steps above ...
+git push -u origin feat/thing
+gh pr create --fill --label feat
+gh pr merge --squash --delete-branch      # once CI is green
+```
+
+The repository settings hold that shape rather than trusting anyone to
+remember it: squash is the only merge button, the subject comes from the pull
+request title, and the branch is deleted on merge. Those live on GitHub rather
+than in the tree, so a fresh clone on another machine inherits them with no
+setup.
+
+## Releases
+
+A release is a tag on `main` plus the notes GitHub generates from the pull
+requests merged since the previous tag. There is no release branch, and no
+release note is written by hand.
+
+```bash
+git switch main && git pull
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+`.github/workflows/release.yml` does the rest: it refuses a tag that does not
+point at a commit on `main` — which would publish a release for code no CI run
+ever saw — and then publishes the release with generated notes.
+`.github/release.yml` decides their headings.
+
+- **One version for the whole repository.** The backend and the frontend deploy
+  together, so they share a tag. The `version` fields in the two
+  `package.json` files are not that number and are not kept in step with it;
+  neither package is published anywhere, so the tag is the only version that
+  means anything.
+- **Semver, read loosely.** Nothing installs this as a dependency, so there is
+  no API to break. Minor for a feature, patch for a fix, major when deploying
+  it takes a manual step — a migration that will not run backwards, say.
+- **This is not `DESIGN.md` §11.** The changelog records decisions and the
+  reasoning behind them for someone reading in a year; release notes record
+  what shipped under which tag. Keep both. Neither replaces the other.
 
 ## The three stand-ins
 
