@@ -1,0 +1,16 @@
+# Headings for the notes GitHub generates from the pull requests merged since
+# the previous tag. Grouping is by PR label rather than by commit prefix, so
+# label a PR to match its Conventional Commits type. The catch-all is last: a
+# forgotten label costs a heading, never an entry.
+changelog:
+  categories:
+    - title: Features
+      labels: [feat]
+    - title: Fixes
+      labels: [fix]
+    - title: Documentation
+      labels: [docs]
+    - title: Chores and CI
+      labels: [chore, ci]
+    - title: Other changes
+      labels: ['*']
