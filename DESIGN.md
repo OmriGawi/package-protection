@@ -1004,3 +1004,26 @@ changelog entries.
   and dashboard tables has always used. Worth knowing for the next Latin string
   that lands on one of these pages: `dir="ltr"` alone moves the text as well as
   ordering it, and on a block element that is almost never what is wanted.
+- 2026-09-19: **Work reaches `main` through a pull request now, and a release is
+  a tag.** Every merge before this entry was made on a laptop, which left no
+  commit on `main` traceable to a review or to the CI run that accepted it —
+  the history reads `Merge the RTL reference heading fix` and stops there. Pull
+  requests are squash-merged, so the PR title becomes the commit subject with
+  its number appended, and the repository settings hold that shape: squash is
+  the only merge button and the branch is deleted on merge. `CONTRIBUTING.md`
+  has the flow.
+
+  Releases are the second half. A tag matching `v*` on `main` triggers
+  `.github/workflows/release.yml`, which publishes a GitHub release whose notes
+  are generated from the pull requests merged since the previous tag, grouped by
+  PR label through `.github/release.yml`. The workflow refuses a tag that does
+  not point at a commit on `main`, because such a release would describe code no
+  CI run ever saw. One tag covers both packages — they deploy together, and the
+  `version` fields in the two `package.json` files are deliberately not kept in
+  step with it.
+
+  Worth keeping straight for whoever reads this later: this changelog and the
+  release notes are not the same record and neither replaces the other. This one
+  says why a decision was made; the notes say what shipped under which tag.
+  That is also why the repository has no `CHANGELOG.md` — a third list of
+  changes would only drift from these two.
