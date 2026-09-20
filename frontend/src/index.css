@@ -63,6 +63,33 @@ table {
   cursor: not-allowed;
 }
 
+/* Every interactive element gets a visible focus ring. Only `.field` had one
+   before, so tabbing through the header, the filter chips and the navy pill
+   moved an invisible cursor. `:focus-visible` rather than `:focus`, so a mouse
+   click does not leave a ring behind. */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* The real control inside a clickable table row (DeliveriesPage, DashboardPage,
+   DeliveryPackagesPage). It inherits the cell's type so the row still reads as
+   one line of text, and carries the keyboard affordance the row itself cannot:
+   a <tr> is not focusable and gets no keyboard activation. */
+.row-link {
+  color: inherit;
+  font: inherit;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.row-link:hover {
+  text-decoration: underline;
+}
+
 .field {
   border: 1px solid #00000018;
   border-radius: 8px;

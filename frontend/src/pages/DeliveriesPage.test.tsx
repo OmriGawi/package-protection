@@ -154,6 +154,18 @@ describe("DeliveriesPage", () => {
     // Router-driven: the row navigates rather than opening an inline panel.
     expect(screen.queryByRole("table")).toBeInTheDocument();
   });
+  it("reaches a delivery by keyboard, not only by clicking the row", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row()]));
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("SHP-84213")).toBeInTheDocument());
+
+    // A <tr onClick> is invisible to the keyboard and to a screen reader's list
+    // of links, so the internal number carries a real link.
+    const link = within(screen.getByRole("table")).getByRole("link", { name: "#42" });
+    expect(link).toHaveAttribute("href", "/deliveries/d1");
+  });
+
   it("does not claim there are no deliveries when the page is merely past the end", async () => {
     vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([], { total: 100, page: 9 }));
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { listPackages, type PackageFilterKey, type PackagePage } from "../api/client";
 import { RowChevron } from "../components/RowChevron";
 import { SearchField } from "../components/SearchField";
@@ -94,10 +94,14 @@ export function DashboardPage() {
     setParams(next);
   }
 
+  // from=dashboard rides in the URL rather than history state so a refresh on
+  // the evidence page still knows where Back should return to.
+  function evidencePath(deliveryId: string, label: number) {
+    return `/deliveries/${deliveryId}?package=${label}&from=dashboard`;
+  }
+
   function openEvidence(deliveryId: string, label: number) {
-    // from=dashboard rides in the URL rather than history state so a refresh on
-    // the evidence page still knows where Back should return to.
-    navigate(`/deliveries/${deliveryId}?package=${label}&from=dashboard`);
+    navigate(evidencePath(deliveryId, label));
   }
 
   const pageCount = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
@@ -200,7 +204,18 @@ export function DashboardPage() {
                         style={{ borderTop: "1px solid var(--border)" }}
                         onClick={() => openEvidence(row.deliveryId, row.label)}
                       >
-                        <td className="px-6 py-4 font-semibold">#{row.deliveryInternalNumber}</td>
+                        {/* Same pair as the deliveries table: the row click is
+                            for the mouse, the link is what keyboard and screen
+                            reader users actually reach. */}
+                        <td className="px-6 py-4 font-semibold">
+                          <Link
+                            to={evidencePath(row.deliveryId, row.label)}
+                            className="row-link"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            #{row.deliveryInternalNumber}
+                          </Link>
+                        </td>
                         <td
                           className="px-6 py-4"
                           style={{ color: "var(--text-secondary)", direction: "ltr", textAlign: "right" }}

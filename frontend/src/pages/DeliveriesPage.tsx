@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { listDeliveries, type DeliveryPage, type DeliveryStatusKey } from "../api/client";
 import { Logo } from "../components/Logo";
 import { RowChevron } from "../components/RowChevron";
@@ -238,7 +238,21 @@ export function DeliveriesPage() {
                         style={{ borderTop: "1px solid var(--border)" }}
                         onClick={() => navigate(`/deliveries/${delivery.id}`)}
                       >
-                        <td className="px-6 py-4 font-semibold">#{delivery.internalNumber}</td>
+                        {/* The row's onClick is a mouse convenience; this link is
+                            what makes the delivery reachable at all by keyboard
+                            and by a screen reader's list of links, and it is what
+                            makes middle-click open a second tab. stopPropagation
+                            keeps the row handler from navigating a second time
+                            on top of it. */}
+                        <td className="px-6 py-4 font-semibold">
+                          <Link
+                            to={`/deliveries/${delivery.id}`}
+                            className="row-link"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            #{delivery.internalNumber}
+                          </Link>
+                        </td>
                         <td
                           className="px-6 py-4"
                           style={{ color: "var(--text-secondary)", direction: "ltr", textAlign: "right" }}

@@ -180,6 +180,17 @@ describe("DashboardPage", () => {
     );
   });
 
+  it("reaches the evidence by keyboard, not only by clicking the row", async () => {
+    vi.spyOn(apiClient, "listPackages").mockResolvedValue(page([row({ deliveryId: "d7", label: 3 })]));
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("SHP-88291")).toBeInTheDocument());
+
+    // Same href the row click navigates to, so the two cannot drift apart.
+    const link = within(screen.getByRole("table")).getByRole("link", { name: "#1042" });
+    expect(link).toHaveAttribute("href", "/deliveries/d7?package=3&from=dashboard");
+  });
+
   it("offers the review action only where a verdict can still change", async () => {
     vi.spyOn(apiClient, "listPackages").mockResolvedValue(
       page([
