@@ -106,8 +106,11 @@ flowchart LR
 Priorities 1 and 2 outrank 3 even mid-transit: an opened package does not wait
 for the rest of the delivery to matter.
 
-Search, status filter, sort and paging all run in Postgres and live in the URL,
-so a filtered view survives a refresh and the back button steps through it.
+Search, status filter and paging all run in Postgres and live in the URL, so a
+filtered view survives a refresh and the back button steps through it. The
+order is not among them: rows come back newest-first by internal number and
+there is no way to ask for another ordering. `GET /api/deliveries` takes
+`search`, `status` and `page` and nothing else.
 
 Every table row can be opened two ways. Clicking anywhere on it works, and the
 cell holding the number is a real control of its own — a link on this screen

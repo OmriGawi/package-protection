@@ -1126,3 +1126,17 @@ changelog entries.
   still holds: clicking a card never changes the number on it. Selected reads
   as a navy ring rather than a fill, since the number and its color are the
   content and a filled card would bury both.
+- 2026-09-20: **The docs claimed a sort the app has never had.**
+  `docs/user-flows.md` said search, status filter, sort and paging all live in
+  the URL, and `docs/architecture.md` listed `sort` among what
+  `GET /api/deliveries` takes. It takes `search`, `status` and `page`; the order
+  is fixed at `internalNumber DESC` in `services/deliveryQuery.ts` and no screen
+  offers a control for it. A reader looking for the sort parameter would have
+  found nothing and had no way to tell whether it was missing or they were.
+
+  Both files now say the order is fixed rather than selectable. The §11 entry
+  from 2026-09-04 still reads "search, filter, sort and paging all run in
+  Postgres", which was true of where the ordering happens and is left alone:
+  entries here are a record of what was decided when, not a page to correct.
+  The dashboard's own priority ordering (§4.4) was never in question — it is
+  fixed too, and both docs already described it accurately.
