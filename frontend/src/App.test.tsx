@@ -35,6 +35,16 @@ describe("App shell", () => {
     expect(screen.getByRole("main")).toHaveAttribute("id", "main");
   });
 
+  it("marks the page the header nav is on", async () => {
+    renderApp();
+
+    const current = await screen.findByRole("link", { name: "המשלוחים שלי" });
+    // The sliding pill is measured from the DOM and never appears under jsdom,
+    // so the class is what says which link it would be sitting on.
+    expect(current.className).toContain("is-active");
+    expect(screen.getByRole("link", { name: "לוח בקרה" }).className).not.toContain("is-active");
+  });
+
   it("names the main landmark", async () => {
     renderApp();
 
