@@ -75,7 +75,7 @@ export function DeliveryDetailsCard({
 
   return (
     <div className="card" style={{ padding: "26px 28px", height: "fit-content" }}>
-      <div className="text-[13.5px] font-bold mb-5">פרטי המשלוח</div>
+      <h2 className="text-[13.5px] font-bold mb-5">פרטי המשלוח</h2>
 
       <div className="inline-flex rounded-lg overflow-hidden mb-6" style={{ border: "1px solid #00000018" }}>
         {(["EXPORT", "IMPORT"] as const).map((value) => (

@@ -46,9 +46,12 @@ export function PhotoDraftThumbs({
 }) {
   return (
     <div className="grid gap-2.5 mt-3.5" style={{ gridTemplateColumns: "repeat(6,1fr)", maxWidth }}>
-      {photos.map((photo) => (
+      {photos.map((photo, index) => (
         <div key={photo.id} className="thumb">
-          <img src={photo.url} alt="" />
+          {/* Named rather than decorative: these are the photos being submitted
+              as evidence, and the saved ones on the delivery page are named the
+              same way. */}
+          <img src={photo.url} alt={`תמונה ${index + 1}`} />
           <span
             className="thumb-flag"
             title={photo.reason}

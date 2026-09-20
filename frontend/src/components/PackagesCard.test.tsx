@@ -37,6 +37,18 @@ describe("PackagesCard", () => {
     expect(document.querySelector('input[type="file"]')).toBeDisabled();
   });
 
+  it("names each picked photo instead of marking it decorative", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await addPhotos(user, 2);
+
+    // These are the evidence being submitted, and the saved ones on the
+    // delivery page are named the same way.
+    await waitFor(() => expect(screen.getByAltText("תמונה 1")).toBeInTheDocument());
+    expect(screen.getByAltText("תמונה 2")).toBeInTheDocument();
+  });
+
   it("keeps save disabled until four valid photos are attached", async () => {
     const user = userEvent.setup();
     render(<Harness />);

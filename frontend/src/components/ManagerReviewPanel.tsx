@@ -115,7 +115,7 @@ export function ManagerReviewPanel({
       </div>
 
       {error && (
-        <p className="text-[12px] mt-2" style={{ color: "var(--red)" }}>
+        <p role="alert" className="text-[12px] mt-2" style={{ color: "var(--red)" }}>
           {error}
         </p>
       )}
