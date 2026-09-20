@@ -43,7 +43,7 @@ export function Toast({ title, detail, onDismiss }: ToastProps) {
         left: 24,
         zIndex: 50,
         maxWidth: 460,
-        boxShadow: "0 6px 24px rgba(0,0,0,.10)",
+        boxShadow: "var(--shadow-raised)",
       }}
     >
       <span

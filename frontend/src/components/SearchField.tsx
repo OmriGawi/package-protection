@@ -39,7 +39,7 @@ export function SearchField({
         height="15"
         viewBox="0 0 24 24"
         fill="none"
-        stroke="#00000055"
+        stroke="var(--icon-muted)"
         strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"

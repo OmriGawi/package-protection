@@ -1,17 +1,57 @@
 /* Design tokens, originally ported from the ui/index.html mockup. That mockup
    is gone now that every screen is built here (DESIGN.md §8), so these are the
-   definition rather than a copy of one — change them here. */
+   definition rather than a copy of one — change them here.
+
+   Every color in the app comes from this block. A literal anywhere else is a
+   bug in dark mode by construction: the two themes differ only in what these
+   names resolve to. */
 :root {
+  color-scheme: light;
+
   --bg: #f7fafc;
+  /* A card, a field, a table — anything that sits on top of the page. */
+  --surface: #ffffff;
+  /* Recessed against --surface: the photo dropzone. */
+  --surface-sunken: #fbfbfc;
+  /* The header is translucent over whatever scrolls under it. */
+  --surface-header: #ffffffd9;
+  --thumb-bg: #eeeeee;
+
   --text: #000000e6;
   --text-secondary: #666666;
-  --navy: #004370;
-  /* Each hue is dark enough to clear WCAG AA (4.5:1) as text on its own soft
-     background, on the page background, and with white text on top of it —
-     the three ways these five are used. The originals came from the mockup
-     and sat between 2.6:1 and 4.1:1, which made every status badge and every
-     error line fail. The -soft backgrounds keep the original, lighter hue:
-     they are backgrounds, so only the foreground had to move. */
+  /* Decorative iconography — the search magnifier. Not held to text contrast. */
+  --icon-muted: #00000055;
+
+  --border: #00000014;
+  /* Heavier, for something you type into. */
+  --border-field: #00000018;
+
+  /* Three weights of "the pointer is here" over a surface. */
+  --tint-hover: #00000006;
+  --tint: #00000008;
+  --tint-strong: #00000014;
+  --tint-pulse: #00000026;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --scrim: rgba(0, 0, 0, 0.55);
+
+  /* The brand, and what reads on top of it. Called --brand rather than --navy
+     because in dark mode it is not navy. */
+  --brand: #004370;
+  --on-brand: #ffffff;
+  /* The hero wordmark, from the logo mark's own two colors. The subtitle is a
+     shade darker than the mark's #2b7fae, which measured 4.22:1 as text — fine
+     for a logo, which is exempt, and not for a line someone has to read. */
+  --wordmark: #12384c;
+  --wordmark-sub: #2979a6;
+  /* Text on a filled status color — the valid/invalid flag on a thumbnail. */
+  --on-accent: #ffffff;
+
+  /* Each hue clears WCAG AA (4.5:1) as text on its own soft background, on the
+     page background, and with --on-accent on top of it — the three ways these
+     five are used. The originals came from the mockup and sat between 2.6:1
+     and 4.1:1, which made every status badge and every error line fail. */
   --blue: #006bab;
   --blue-soft: #0098f229;
   --purple: #593ffc;
@@ -22,7 +62,102 @@
   --red-soft: #ff636329;
   --amber: #8e6100;
   --amber-soft: #c98a0022;
-  --border: #00000014;
+}
+
+/* Dark mode, twice over: once for the system preference, once for an explicit
+   choice from the header toggle. The values are identical and index.css.test.ts
+   asserts that they stay identical — two blocks are the price of letting the
+   toggle override the system either way.
+
+   The hues are lightened until they clear AA against the dark surface and
+   against their own soft background, the same bar the light ones meet. They
+   are not the light hues reused: #d10000 on a dark card is unreadable. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #0f1419;
+    --surface: #171c22;
+    --surface-sunken: #1c222a;
+    --surface-header: #0f1419d9;
+    --thumb-bg: #2a3038;
+
+    --text: #e6e9ee;
+    --text-secondary: #9fa9b7;
+    --icon-muted: #ffffff66;
+
+    --border: #ffffff1f;
+    --border-field: #ffffff2e;
+
+    --tint-hover: #ffffff0a;
+    --tint: #ffffff12;
+    --tint-strong: #ffffff24;
+    --tint-pulse: #ffffff3d;
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.5);
+    --scrim: rgba(0, 0, 0, 0.7);
+
+    --brand: #7cc2f0;
+    --on-brand: #0f1419;
+    --wordmark: #dbe7ef;
+    --wordmark-sub: #7cc2f0;
+    --on-accent: #0f1419;
+
+    --blue: #19aaff;
+    --blue-soft: #19aaff38;
+    --purple: #a397fd;
+    --purple-soft: #a397fd38;
+    --green: #6db607;
+    --green-soft: #6db60738;
+    --red: #ff7777;
+    --red-soft: #ff777738;
+    --amber: #d89400;
+    --amber-soft: #d8940038;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0f1419;
+  --surface: #171c22;
+  --surface-sunken: #1c222a;
+  --surface-header: #0f1419d9;
+  --thumb-bg: #2a3038;
+
+  --text: #e6e9ee;
+  --text-secondary: #9fa9b7;
+  --icon-muted: #ffffff66;
+
+  --border: #ffffff1f;
+  --border-field: #ffffff2e;
+
+  --tint-hover: #ffffff0a;
+  --tint: #ffffff12;
+  --tint-strong: #ffffff24;
+  --tint-pulse: #ffffff3d;
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-raised: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(0, 0, 0, 0.7);
+
+  --brand: #7cc2f0;
+  --on-brand: #0f1419;
+  --wordmark: #dbe7ef;
+  --wordmark-sub: #7cc2f0;
+  --on-accent: #0f1419;
+
+  --blue: #19aaff;
+  --blue-soft: #19aaff38;
+  --purple: #a397fd;
+  --purple-soft: #a397fd38;
+  --green: #6db607;
+  --green-soft: #6db60738;
+  --red: #ff7777;
+  --red-soft: #ff777738;
+  --amber: #d89400;
+  --amber-soft: #d8940038;
 }
 
 body {
@@ -46,15 +181,15 @@ table {
   transition: background 0.12s;
 }
 .row-hover:hover {
-  background: #00000006;
+  background: var(--tint-hover);
 }
 
 .btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  background: var(--navy);
-  color: #fff;
+  background: var(--brand);
+  color: var(--on-brand);
   border: none;
   cursor: pointer;
   padding: 11px 22px;
@@ -109,8 +244,8 @@ table {
   padding: 10px 18px;
   clip-path: none;
   z-index: 50;
-  background: var(--navy);
-  color: #fff;
+  background: var(--brand);
+  color: var(--on-brand);
   border-radius: 9999px;
   font-weight: 600;
   font-size: 13px;
@@ -140,12 +275,33 @@ table {
 }
 .nav-link:hover,
 .nav-link.is-active {
-  color: var(--navy);
+  color: var(--brand);
 }
 /* The current page keeps a marker of its own: magnification says where the
    pointer is, not which page you are on. */
 .nav-link.is-active {
   background: var(--blue-soft);
+}
+
+/* The light/dark switch. Quiet by default — it is a preference, not an action
+   anyone came to the page to take — and it answers the pointer like the nav. */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.theme-toggle:hover {
+  background: var(--tint);
+  color: var(--text);
 }
 
 /* A dashboard stat card that sets the filter it counts (DESIGN.md §4.4.1).
@@ -161,13 +317,13 @@ table {
 }
 .stat-card:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+  box-shadow: var(--shadow-raised);
 }
 /* Selected reads as a ring rather than a fill: the number and its color are
    the content, and a filled card would bury both. */
 .stat-card[aria-pressed="true"] {
-  border-color: var(--navy);
-  box-shadow: inset 0 0 0 1px var(--navy);
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
 }
 
 /* A status filter chip (DESIGN.md §4.3, §4.4.2). The styling lives here rather
@@ -183,17 +339,17 @@ table {
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
-  background: #00000008;
+  background: var(--tint);
   color: var(--text-secondary);
   transition: background 0.15s, color 0.15s;
 }
 .chip:hover {
-  background: #00000014;
+  background: var(--tint-strong);
   color: var(--text);
 }
 .chip[aria-pressed="true"] {
-  background: var(--navy);
-  color: #fff;
+  background: var(--brand);
+  color: var(--on-brand);
 }
 .chip[aria-pressed="true"]:hover {
   opacity: 0.85;
@@ -217,12 +373,12 @@ table {
 }
 
 .field {
-  border: 1px solid #00000018;
+  border: 1px solid var(--border-field);
   border-radius: 8px;
   padding: 9px 12px;
   font-size: 13.5px;
   font-family: inherit;
-  background: #fff;
+  background: var(--surface);
   color: var(--text);
   width: 100%;
 }
@@ -233,8 +389,8 @@ table {
 
 .card {
   border-radius: 16px;
-  background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
   border: 1px solid var(--border);
 }
 
@@ -244,11 +400,11 @@ table {
   align-items: center;
   justify-content: center;
   gap: 5px;
-  border: 1.5px dashed #00000022;
+  border: 1.5px dashed var(--border-field);
   border-radius: 12px;
   padding: 20px 16px;
   cursor: pointer;
-  background: #fbfbfc;
+  background: var(--surface-sunken);
   text-align: center;
 }
 .dropzone:hover {
@@ -266,7 +422,7 @@ table {
   padding-top: 100%;
   border-radius: 8px;
   overflow: hidden;
-  background: #eee;
+  background: var(--thumb-bg);
   border: 1px solid var(--border);
 }
 .thumb img {
@@ -286,7 +442,7 @@ table {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: var(--on-brand);
 }
 .thumb-remove {
   position: absolute;
@@ -295,14 +451,21 @@ table {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
+  background: var(--scrim);
+  color: var(--on-brand);
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
   cursor: pointer;
   padding: 0;
+}
+
+/* Anything that sits on the page as a solid panel: a table card, a photo card.
+   An attribute rather than a class so it composes with the Tailwind classes
+   already on those elements without fighting them for the background. */
+[data-surface] {
+  background: var(--surface);
 }
 
 /* One definition of a table cell's padding, so row density is a single number
@@ -325,12 +488,13 @@ table {
   display: block;
   height: 11px;
   border-radius: 999px;
-  background: #00000010;
+  background: var(--tint-strong);
   animation: skeleton-pulse 1.3s ease-in-out infinite;
 }
 @keyframes skeleton-pulse {
   50% {
-    background: #0000001f;
+    /* A second stop on the same scale, so the pulse reads in both themes. */
+    background: var(--tint-pulse);
   }
 }
 
@@ -355,7 +519,7 @@ table {
   animation: row-flash 6s ease-out;
 }
 .row-flash:hover {
-  background: #00000006 !important;
+  background: var(--tint-hover) !important;
 }
 .toast {
   animation: toast-in 0.18s ease-out;

@@ -45,9 +45,20 @@ frontend/
   src/api/client.ts        The only module that knows the API's shape
   src/pages/               One per route
   src/components/          Reused across pages
-  src/lib/                 Display formatting, hooks, label rules
+  src/lib/                 Display formatting, hooks, label rules, theme
+  src/index.css            Design tokens and every color in the app
 docs/                      This folder
 ```
+
+Every color the frontend draws comes from a custom property in
+`src/index.css` — there are no color literals in components, and a new one is a
+dark-mode bug by construction. The file defines the light palette on `:root` and
+the dark palette twice: once under `prefers-color-scheme: dark` for people who
+have never touched the toggle, once under `:root[data-theme="dark"]` for people
+who have. `src/lib/theme.ts` owns that attribute and the stored choice;
+`main.tsx` applies it before the first render so a stored dark choice is not a
+white flash. `src/index.css.test.ts` holds both palettes to WCAG AA and asserts
+the two dark blocks have not drifted apart.
 
 The `routes → services → lib` split is the one structural rule on the backend:
 routes own HTTP, services own decisions, lib owns the seams. A service never

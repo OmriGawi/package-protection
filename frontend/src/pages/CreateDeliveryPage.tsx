@@ -69,7 +69,7 @@ export function CreateDeliveryPage() {
       </Link>
 
       <div className="mb-7">
-        <h1 className="text-2xl font-extrabold" style={{ color: "var(--navy)" }}>
+        <h1 className="text-2xl font-extrabold" style={{ color: "var(--brand)" }}>
           משלוח חדש
         </h1>
         <p className="mt-1.5 text-sm" style={{ color: "var(--text-secondary)" }}>

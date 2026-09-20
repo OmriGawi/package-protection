@@ -1152,3 +1152,33 @@ changelog entries.
   line of small text has no reason to match the height of the rows it labels.
   What kept its own spacing is everything that is not a row of data — the pager
   strip, the error line, the tall empty-state cell and the expanded photo panel.
+- 2026-09-20: **Dark mode**, and the tokenization it forced. Sixty-six color
+  literals were spread across ten files — `#fff` thirteen times, four weights of
+  translucent black, five shadows — so there was nothing to switch. Every one of
+  them is now a custom property in `index.css`, which means a literal in a
+  component is from here on a dark-mode bug by construction rather than a matter
+  of taste. Naming them said what the app actually has: `--surface`,
+  `--surface-sunken`, `--surface-header`, `--border-field`, three tint weights
+  for hover states, two shadows, `--scrim`, `--thumb-bg`. `--navy` became
+  `--brand` with an `--on-brand` beside it, because in dark mode it is not navy.
+
+  The theme has three states, not two. "System" is the default and stays the
+  default, so anyone who never touches the toggle follows their OS, including
+  when it changes at dusk; choosing light or dark pins it in `localStorage` and
+  beats the system in either direction. That is why the dark palette is written
+  twice — once under `prefers-color-scheme`, once under `[data-theme="dark"]` —
+  and why a test asserts the two blocks stay identical. `main.tsx` applies the
+  stored choice before the first render: a paint later is a white flash on every
+  load for the people most likely to notice.
+
+  The dark hues are not the light ones reused. `#d10000` on a dark card is
+  unreadable, so each is lightened until it clears AA against the dark surface
+  and against its own soft badge background — the same bar the light palette
+  meets, asserted for both themes now.
+
+  Two things surfaced while building it. The contrast test had been parsing
+  comment prose as declarations, so a `--surface:` written inside a comment
+  swallowed the real declaration after it and the light theme was being checked
+  against garbage. And the hero tagline borrowed the logo mark's blue at 4.22:1
+  — exempt as a logo, not as a line of text — so it is a shade darker than the
+  mark it came from.
