@@ -1044,3 +1044,20 @@ changelog entries.
   which is the correct behaviour for a seed and no help here. The file is now
   recommended on every machine, with the container's own database and a `test`
   schema as the default the example file hands you.
+- 2026-09-20: **One command migrates both schemas, and the backend says which
+  one it is on.** Giving the suite its own schema created a second thing to
+  remember: `prisma migrate dev` reads `.env` and only `.env`, so a schema edit
+  landed in the development schema and left the test schema a migration behind.
+  That surfaces as tests failing against columns that plainly exist, which is a
+  long way from its cause. `npm run migrate` now runs both halves, the second
+  through `backend/scripts/migrate-test.mjs`, which reads whatever schema the
+  local `.env.test` names rather than a name fixed in the repo — `test` on a
+  container here, `test_omri` on the shared cluster.
+
+  The script sets `DATABASE_URL` for a child process on purpose. PowerShell has
+  no `VAR=value command` prefix, so on the Windows workstation the alternative
+  is `$env:DATABASE_URL` and remembering to clear it; forgetting points every
+  later command in that session at the test schema. `config.databaseSchema` is
+  derived from the URL and logged in `server_listening`, so the question the
+  whole arrangement creates — which schema am I on — is answered by starting the
+  app rather than by running `prisma migrate status`.

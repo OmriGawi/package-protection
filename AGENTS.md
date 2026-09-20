@@ -58,8 +58,13 @@ cd backend  && npm run verify   # typecheck, lint, test, build
 cd frontend && npm run verify   # same
 
 cd backend  && npm run seed     # reset the development data
-cd backend  && npx prisma migrate dev --name <change>   # after a schema edit
+cd backend  && npm run migrate -- --name <change>       # after a schema edit
 ```
+
+`npm run migrate` covers both schemas — `prisma migrate dev` for the one `.env`
+names, then `scripts/migrate-test.mjs` for the one `.env.test` names. Running
+`prisma migrate dev` alone leaves the suite's schema a migration behind, which
+shows up as tests failing against columns that exist in the editor.
 
 `npm run verify` in **both** packages is the bar for calling work done — not
 one of them, and not only the package you think you touched. Vitest strips

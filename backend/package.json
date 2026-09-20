@@ -13,7 +13,9 @@
     "typecheck": "tsc --noEmit",
     "verify": "npm run typecheck && npm run lint && npm test && npm run build",
     "seed": "tsx prisma/seed.ts",
-    "setup": "prisma migrate deploy && npm run seed"
+    "setup": "prisma migrate deploy && npm run seed",
+    "migrate": "prisma migrate dev && npm run migrate:test",
+    "migrate:test": "node scripts/migrate-test.mjs"
   },
   "keywords": [],
   "author": "",

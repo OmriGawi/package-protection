@@ -19,6 +19,36 @@ describe("loadConfig", () => {
     });
   });
 
+  // Which schema a command lands in is the one thing two env files disagree
+  // about, so it is derived here rather than left to whoever reads the URL.
+  describe("databaseSchema", () => {
+    it("reads the schema parameter when the URL names one", () => {
+      const config = loadConfig({
+        DATABASE_URL: "postgresql://user:pass@localhost:5432/db?schema=test_omri",
+      });
+
+      expect(config.databaseSchema).toBe("test_omri");
+    });
+
+    it("falls back to public when the URL names none", () => {
+      expect(loadConfig(VALID).databaseSchema).toBe("public");
+    });
+
+    it("keeps other parameters out of it", () => {
+      const config = loadConfig({
+        DATABASE_URL: "postgresql://user:pass@localhost:5432/db?sslmode=disable&schema=test",
+      });
+
+      expect(config.databaseSchema).toBe("test");
+    });
+
+    // A boot log line is not a reason to refuse to start, and DATABASE_URL has
+    // its own validation.
+    it("reports an unparseable URL as unknown rather than throwing", () => {
+      expect(loadConfig({ DATABASE_URL: "not-a-url" }).databaseSchema).toBe("unknown");
+    });
+  });
+
   it("rejects a missing DATABASE_URL", () => {
     expect(() => loadConfig({})).toThrow(ConfigError);
   });
