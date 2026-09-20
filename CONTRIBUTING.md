@@ -34,8 +34,28 @@ Copy `backend/.env.test.example` to `backend/.env.test` and run `npx prisma
 migrate deploy` once with it — vitest loads it ahead of `.env`, so the
 separation is a file rather than a habit.
 
-On a shared Postgres the reason is that the suite must never touch a database
-someone else is reading. On a throwaway container it is smaller but real: a run
+After a schema edit, migrate both. `npm run migrate` in `backend/` does it in
+one command — `prisma migrate dev` against the schema `.env` names, then
+`scripts/migrate-test.mjs` against the one `.env.test` names, whatever it is
+called there:
+
+```bash
+cd backend && npm run migrate -- --name <change>
+```
+
+The script sets `DATABASE_URL` for a child process rather than for your shell,
+which is what makes it the same command on both machines: PowerShell has no
+`VAR=value command` prefix, so the alternative there is `$env:DATABASE_URL` plus
+remembering to clear it, and forgetting leaves every later command in that
+session pointed at the test schema. With no `.env.test` present — CI — it prints
+a line and exits 0.
+
+The backend logs the schema it is pointed at on every boot (`dbSchema` in
+`server_listening`), so `npm run dev` answers "which one am I on?" without
+anyone running `prisma migrate status` to find out.
+
+On a shared Postgres the reason for the separate schema is that the suite must
+never touch a database someone else is reading. On a throwaway container it is smaller but real: a run
 deletes the seeded deliveries under whichever screen you had open and leaves a
 few hundred fixtures in their place, and `npm run seed` afterwards restores the
 seeded rows without removing the fixtures. This used to say the file was

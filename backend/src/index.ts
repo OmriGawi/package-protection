@@ -132,7 +132,14 @@ async function start() {
   const stopSweeping = startCheckRecovery();
 
   const server = app.listen(config.port, () => {
-    log.info("server_listening", { port: config.port, nodeEnv: config.nodeEnv });
+    // The schema is in here because the suite reads `.env.test` and everything
+    // else reads `.env`: on one machine two commands legitimately point at two
+    // schemas, and guessing which is which has cost a reset of the wrong one.
+    log.info("server_listening", {
+      port: config.port,
+      nodeEnv: config.nodeEnv,
+      dbSchema: config.databaseSchema,
+    });
   });
 
   shutdownOn("SIGTERM", server, stopSweeping);

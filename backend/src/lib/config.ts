@@ -20,6 +20,14 @@ export interface Config {
   isProduction: boolean;
   port: number;
   databaseUrl: string;
+  /**
+   * The Postgres schema `databaseUrl` names, or `public` where it names none.
+   *
+   * Derived rather than configured, and logged at boot: the suite runs against
+   * `.env.test` while everything else runs against `.env`, so "which schema am
+   * I pointed at?" is a question with two right answers on the same machine.
+   */
+  databaseSchema: string;
   storageDir: string | undefined;
   /** Allowed browser origins. Empty means "any", which only development gets. */
   corsOrigins: string[];
@@ -54,6 +62,21 @@ function parseNodeEnv(raw: string | undefined, problems: string[]): NodeEnv {
   }
   problems.push(`NODE_ENV must be development, test or production (got "${raw}")`);
   return "development";
+}
+
+/**
+ * Reads the `schema` parameter out of a Postgres connection string.
+ *
+ * A URL this cannot parse is not an error here — `DATABASE_URL` is validated
+ * on its own, and a boot log line is not the place to fail a startup.
+ */
+function parseDatabaseSchema(raw: string | undefined): string {
+  if (!raw) return "unknown";
+  try {
+    return new URL(raw).searchParams.get("schema")?.trim() || "public";
+  } catch {
+    return "unknown";
+  }
 }
 
 function parseInteger(
@@ -165,6 +188,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     isProduction,
     port: parseInteger("PORT", env.PORT, 4000, problems),
     databaseUrl: databaseUrl ?? "",
+    databaseSchema: parseDatabaseSchema(databaseUrl),
     storageDir: env.STORAGE_DIR?.trim() || undefined,
     corsOrigins,
     trustProxy: parseTrustProxy(env.TRUST_PROXY, isProduction, problems),
