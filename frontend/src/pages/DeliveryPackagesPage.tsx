@@ -175,7 +175,7 @@ export function DeliveryPackagesPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)", maxWidth: 900 }}>
+          <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -204,7 +204,23 @@ export function DeliveryPackagesPage() {
                       style={{ borderBottom: isExpanded ? "none" : "1px solid var(--border)" }}
                       onClick={() => toggleView(pkg.label)}
                     >
-                      <td className="px-6 py-4 font-semibold">חבילה {pkg.label}</td>
+                      {/* This row expands a panel rather than navigating, so the
+                          control is a button and not a link. aria-expanded is
+                          what tells a screen reader the panel below belongs to
+                          it; the row's own onClick stays for the mouse. */}
+                      <td className="px-6 py-4 font-semibold">
+                        <button
+                          type="button"
+                          className="row-link"
+                          aria-expanded={isExpanded}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            toggleView(pkg.label);
+                          }}
+                        >
+                          חבילה {pkg.label}
+                        </button>
+                      </td>
                       <td className="px-6 py-4" style={{ color: "var(--text-secondary)" }}>
                         {WORKFLOW_TEXT[pkg.workflowStatus]}
                       </td>

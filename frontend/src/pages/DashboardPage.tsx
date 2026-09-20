@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { listPackages, type PackageFilterKey, type PackagePage } from "../api/client";
 import { RowChevron } from "../components/RowChevron";
 import { SearchField } from "../components/SearchField";
@@ -94,10 +94,14 @@ export function DashboardPage() {
     setParams(next);
   }
 
+  // from=dashboard rides in the URL rather than history state so a refresh on
+  // the evidence page still knows where Back should return to.
+  function evidencePath(deliveryId: string, label: number) {
+    return `/deliveries/${deliveryId}?package=${label}&from=dashboard`;
+  }
+
   function openEvidence(deliveryId: string, label: number) {
-    // from=dashboard rides in the URL rather than history state so a refresh on
-    // the evidence page still knows where Back should return to.
-    navigate(`/deliveries/${deliveryId}?package=${label}&from=dashboard`);
+    navigate(evidencePath(deliveryId, label));
   }
 
   const pageCount = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
@@ -138,12 +142,7 @@ export function DashboardPage() {
                 key={chip.key}
                 type="button"
                 aria-pressed={active}
-                className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition"
-                style={
-                  active
-                    ? { background: "var(--navy)", color: "#fff" }
-                    : { background: "#00000008", color: "var(--text-secondary)" }
-                }
+                className="chip"
                 onClick={() =>
                   updateParams({ filter: chip.key === "ALL" ? null : chip.key, page: null })
                 }
@@ -154,6 +153,17 @@ export function DashboardPage() {
           })}
         </div>
       </div>
+
+      {/* Filtering and paging swap the rows underneath without moving focus, so
+          nothing tells a screen reader that the table changed. Always in the
+          DOM, because a live region created at the same moment its text appears
+          is not announced. aria-live without role="status": the toast already
+          owns that role, and two status nodes would be ambiguous. The wording
+          is the count rather than the pager's range — what changed is how many
+          rows there are. */}
+      <p className="sr-only" aria-live="polite">
+        {result ? `נמצאו ${result.total} חבילות` : ""}
+      </p>
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
         {error ? (
@@ -200,7 +210,18 @@ export function DashboardPage() {
                         style={{ borderTop: "1px solid var(--border)" }}
                         onClick={() => openEvidence(row.deliveryId, row.label)}
                       >
-                        <td className="px-6 py-4 font-semibold">#{row.deliveryInternalNumber}</td>
+                        {/* Same pair as the deliveries table: the row click is
+                            for the mouse, the link is what keyboard and screen
+                            reader users actually reach. */}
+                        <td className="px-6 py-4 font-semibold">
+                          <Link
+                            to={evidencePath(row.deliveryId, row.label)}
+                            className="row-link"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            #{row.deliveryInternalNumber}
+                          </Link>
+                        </td>
                         <td
                           className="px-6 py-4"
                           style={{ color: "var(--text-secondary)", direction: "ltr", textAlign: "right" }}

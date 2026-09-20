@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { listDeliveries, type DeliveryPage, type DeliveryStatusKey } from "../api/client";
 import { Logo } from "../components/Logo";
 import { RowChevron } from "../components/RowChevron";
@@ -167,12 +167,7 @@ export function DeliveriesPage() {
                 key={filter.key}
                 type="button"
                 aria-pressed={active}
-                className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition"
-                style={
-                  active
-                    ? { background: "var(--navy)", color: "#fff" }
-                    : { background: "#00000008", color: "var(--text-secondary)" }
-                }
+                className="chip"
                 onClick={() =>
                   updateParams({ status: filter.key === "ALL" ? null : filter.key, page: null })
                 }
@@ -183,6 +178,17 @@ export function DeliveriesPage() {
           })}
         </div>
       </div>
+
+      {/* Filtering and paging swap the rows underneath without moving focus, so
+          nothing tells a screen reader that the table changed. Always in the
+          DOM, because a live region created at the same moment its text appears
+          is not announced. aria-live without role="status": the toast already
+          owns that role, and two status nodes would be ambiguous. The wording
+          is the count rather than the pager's range — what changed is how many
+          rows there are. */}
+      <p className="sr-only" aria-live="polite">
+        {result ? `נמצאו ${result.total} משלוחים` : ""}
+      </p>
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
         {error ? (
@@ -238,7 +244,21 @@ export function DeliveriesPage() {
                         style={{ borderTop: "1px solid var(--border)" }}
                         onClick={() => navigate(`/deliveries/${delivery.id}`)}
                       >
-                        <td className="px-6 py-4 font-semibold">#{delivery.internalNumber}</td>
+                        {/* The row's onClick is a mouse convenience; this link is
+                            what makes the delivery reachable at all by keyboard
+                            and by a screen reader's list of links, and it is what
+                            makes middle-click open a second tab. stopPropagation
+                            keeps the row handler from navigating a second time
+                            on top of it. */}
+                        <td className="px-6 py-4 font-semibold">
+                          <Link
+                            to={`/deliveries/${delivery.id}`}
+                            className="row-link"
+                            onClick={(event) => event.stopPropagation()}
+                          >
+                            #{delivery.internalNumber}
+                          </Link>
+                        </td>
                         <td
                           className="px-6 py-4"
                           style={{ color: "var(--text-secondary)", direction: "ltr", textAlign: "right" }}

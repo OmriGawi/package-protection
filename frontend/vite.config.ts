@@ -7,6 +7,9 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
+    // Without this, a CSS import resolves to an empty string in tests — which
+    // makes index.css.test.ts, the contrast guard, silently read nothing.
+    css: true,
     globals: true,
     setupFiles: './src/test/setup.ts',
     coverage: {

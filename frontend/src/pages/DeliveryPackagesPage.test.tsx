@@ -210,6 +210,23 @@ describe("DeliveryPackagesPage", () => {
     }
   });
 
+  it("expands a package from the keyboard and says so through aria-expanded", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(delivery([pkg()]));
+    const user = userEvent.setup();
+
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("חבילה 1")).toBeInTheDocument());
+    const toggle = screen.getByRole("button", { name: "חבילה 1" });
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+
+    // Keyboard activation, not a click: the <tr> handler alone never sees this.
+    toggle.focus();
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-expanded", "true"));
+  });
+
   it("opens the package the dashboard linked to (DESIGN.md §4.4.4)", async () => {
     vi.spyOn(apiClient, "getDelivery").mockResolvedValue(
       delivery([
