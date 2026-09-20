@@ -72,11 +72,12 @@ table {
 /* Every interactive element gets a visible focus ring. Only `.field` had one
    before, so tabbing through the header, the filter chips and the navy pill
    moved an invisible cursor. `:focus-visible` rather than `:focus`, so a mouse
-   click does not leave a ring behind. */
+   click does not leave a ring behind. No border-radius here: the outline
+   already follows each element's own, and setting one would square off the
+   navy pill for exactly as long as it held focus. */
 :focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
-  border-radius: 4px;
 }
 
 /* Text for a screen reader only — the live regions that announce a filtered
