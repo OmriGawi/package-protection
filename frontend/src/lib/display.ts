@@ -101,3 +101,33 @@ export function verdictSourceText(pkg: {
   if (pkg.verdictSource === null) return "—";
   return pkg.verdictSource === "MANUAL" ? "ידני" : "אוטומטי";
 }
+
+/**
+ * The discard warning's two lines, agreeing with how many photos are at stake.
+ *
+ * Hebrew has no "1 תמונות": one picked photo needs a singular noun, a singular
+ * verb and אותה rather than אותן. The photos are on screen beside the dialog,
+ * so the sentence does not count them — it says what is about to happen.
+ *
+ * Addressed to one person (שבחרת), matching how the rest of the app speaks.
+ * Both upload panels warn about the same thing in the same shape, so the
+ * agreement lives here rather than twice.
+ */
+export function discardPhotosWarning(
+  count: number,
+  /** "saved" on the pre-ship card, "sent" on the receive panel — the photos
+   *  there are past saving and waiting to go to the tamper check. */
+  stage: "saved" | "sent",
+  /** What the click would do, e.g. "פתיחת חבילה 1" / "מעבר לחבילה 2". */
+  action: string,
+  /** Feminine agreement for that action: תמחק for פתיחה, ימחק for מעבר. */
+  erases: "תמחק" | "ימחק"
+): { title: string; detail: string } {
+  const one = count === 1;
+  const waiting = stage === "saved" ? (one ? "נשמרה" : "נשמרו") : one ? "נשלחה" : "נשלחו";
+
+  return {
+    title: one ? `התמונה שבחרת טרם ${waiting}` : `התמונות שבחרת טרם ${waiting}`,
+    detail: one ? `${action} ${erases} אותה.` : `${action} ${erases} אותן.`,
+  };
+}

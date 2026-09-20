@@ -1182,3 +1182,26 @@ changelog entries.
   against garbage. And the hero tagline borrowed the logo mark's blue at 4.22:1
   — exempt as a logo, not as a line of text — so it is a shade darker than the
   mark it came from.
+- 2026-09-20: **The two discard warnings became a real dialog.** Both upload
+  panels guard the same thing — photos picked but not yet saved or sent live
+  only in `usePhotoDraft`'s state, so losing them means photographing a box
+  again — and both asked with `window.confirm`. That put a Hebrew question
+  under the browser's English OK/Cancel, docked at the top of the window away
+  from the photos in question, and blocked the thread: on the §4.2 page the
+  check polling stopped dead while the dialog was open.
+
+  `ConfirmDialog` replaces it. The cancelling button holds focus rather than
+  the destructive one, Escape and a backdrop click cancel, Tab cycles inside
+  the dialog, and focus returns to whatever opened it. The buttons name their
+  own actions ("מחיקת התמונות", "ביטול") instead of leaving the question to
+  carry everything, which is what OK/Cancel forces.
+
+  `window.confirm` answers immediately and a dialog answers later, so each
+  caller now parks what was asked for — `pendingEdit`, `pendingView` — and acts
+  on it when the answer arrives. `ReceivePhotosPanel` reports how many photos
+  are picked rather than a dirty flag, because the warning needs the number to
+  get its grammar right: one photo takes a singular noun, a singular verb and
+  אותה rather than אותן. `discardPhotosWarning` in `lib/display.ts` owns that
+  agreement for both panels. The sentence does not print the count — the photos
+  are on screen beside the dialog — and addresses one person (שבחרת), matching
+  the rest of the app.
