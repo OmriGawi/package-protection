@@ -42,6 +42,9 @@ body {
 table {
   border-collapse: collapse;
 }
+.row-hover {
+  transition: background 0.12s;
+}
 .row-hover:hover {
   background: #00000006;
 }
@@ -111,6 +114,53 @@ table {
   border-radius: 9999px;
   font-weight: 600;
   font-size: 13px;
+}
+
+/* A header navigation link. Same reason as .chip for living here rather than
+   inline: :hover cannot override an inline style.
+
+   The underline grows from the right, where a reader of an RTL page starts the
+   word. The active link carries the soft pill and no underline: it is already
+   marked, and two markers on one item is noise. */
+.nav-link {
+  position: relative;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+.nav-link:hover {
+  color: var(--text);
+  background: #00000008;
+}
+.nav-link::after {
+  content: "";
+  position: absolute;
+  inset-inline: 14px;
+  bottom: 3px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--navy);
+  transform: scaleX(0);
+  /* transform-origin takes no logical keyword, so this is the physical side —
+     right is the inline start of this RTL-only app (index.html sets dir). */
+  transform-origin: right;
+  transition: transform 0.18s ease-out;
+}
+.nav-link:hover::after {
+  transform: scaleX(1);
+}
+.nav-link.is-active {
+  background: var(--blue-soft);
+  color: var(--navy);
+}
+/* The current page is not somewhere to travel to, so it answers the pointer
+   without drawing the line that means "go here". */
+.nav-link.is-active::after {
+  content: none;
 }
 
 /* A status filter chip (DESIGN.md §4.3, §4.4.2). The styling lives here rather
@@ -291,5 +341,10 @@ table {
   .row-flash,
   .toast {
     animation: none;
+  }
+  /* The underline still appears on hover, it just stops sliding: the movement
+     is decoration, the line itself is the signal. */
+  .nav-link::after {
+    transition: none;
   }
 }

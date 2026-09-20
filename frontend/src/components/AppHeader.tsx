@@ -28,12 +28,9 @@ export function AppHeader() {
             <NavLink
               key={item.to}
               to={item.to}
-              className="px-3.5 py-2 rounded-lg text-[13px] font-semibold transition"
-              style={({ isActive }) =>
-                isActive
-                  ? { background: "var(--blue-soft)", color: "var(--navy)" }
-                  : { color: "var(--text-secondary)" }
-              }
+              // Styled by class rather than inline, so :hover has something it
+              // can override — an inline style outranks the stylesheet.
+              className={({ isActive }) => (isActive ? "nav-link is-active" : "nav-link")}
             >
               {item.label}
             </NavLink>
