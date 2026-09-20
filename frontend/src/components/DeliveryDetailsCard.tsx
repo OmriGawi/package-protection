@@ -77,7 +77,7 @@ export function DeliveryDetailsCard({
     <div className="card" style={{ padding: "26px 28px", height: "fit-content" }}>
       <h2 className="text-[13.5px] font-bold mb-5">פרטי המשלוח</h2>
 
-      <div className="inline-flex rounded-lg overflow-hidden mb-6" style={{ border: "1px solid #00000018" }}>
+      <div className="inline-flex rounded-lg overflow-hidden mb-6" style={{ border: "1px solid var(--border-field)" }}>
         {(["EXPORT", "IMPORT"] as const).map((value) => (
           <button
             key={value}
@@ -94,8 +94,8 @@ export function DeliveryDetailsCard({
             className="px-6 py-2.5 text-sm font-semibold transition"
             style={
               direction === value
-                ? { background: "var(--blue)", color: "#fff" }
-                : { background: "#fff", color: "var(--text-secondary)" }
+                ? { background: "var(--blue)", color: "var(--on-accent)" }
+                : { background: "var(--surface)", color: "var(--text-secondary)" }
             }
           >
             {value === "EXPORT" ? "ייצוא" : "יבוא"}

@@ -28,7 +28,7 @@ export function ManagerReviewPanel({
   // confirmation that disappears on the next load.
   if (pkg.verdictSource === "MANUAL") {
     return (
-      <div className="mt-5 rounded-lg px-4 py-3" style={{ background: "#fafbfc", border: "1px solid var(--border)" }}>
+      <div className="mt-5 rounded-lg px-4 py-3" style={{ background: "var(--surface-sunken)", border: "1px solid var(--border)" }}>
         <div className="text-[12px] font-semibold mb-1">
           נבדק ידנית · {pkg.verdict === "OPENED" ? "אושר כנפתחה" : "אושר כתקינה"}
         </div>
@@ -71,7 +71,7 @@ export function ManagerReviewPanel({
   }
 
   return (
-    <div className="mt-5 rounded-lg px-4 py-4" style={{ background: "#fafbfc", border: "1px solid var(--border)" }}>
+    <div className="mt-5 rounded-lg px-4 py-4" style={{ background: "var(--surface-sunken)", border: "1px solid var(--border)" }}>
       <div className="text-[12.5px] font-semibold mb-1">בדיקה ידנית</div>
       <p className="text-[11.5px] mb-3" style={{ color: "var(--text-secondary)" }}>
         מה נמצא בבדיקה הפיזית? ההערה נשמרת לצמיתות לצד התמונות.

@@ -114,7 +114,7 @@ export function DashboardPage() {
   return (
     <>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <h1 className="text-[26px] font-extrabold tracking-tight" style={{ color: "var(--navy)" }}>
+        <h1 className="text-[26px] font-extrabold tracking-tight" style={{ color: "var(--brand)" }}>
           לוח בקרה
         </h1>
       </div>
@@ -182,7 +182,7 @@ export function DashboardPage() {
         {result ? `נמצאו ${result.total} חבילות` : ""}
       </p>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+      <div className="rounded-2xl shadow-sm overflow-hidden" data-surface style={{ border: "1px solid var(--border)" }}>
         {error ? (
           <p role="alert" className="px-6 py-5 text-[13px]" style={{ color: "var(--red)" }}>
             {error}
@@ -289,7 +289,7 @@ export function DashboardPage() {
                             <button
                               type="button"
                               className="px-3.5 py-1.5 rounded-lg text-[12.5px] font-semibold"
-                              style={{ border: "1px solid var(--navy)", color: "var(--navy)" }}
+                              style={{ border: "1px solid var(--brand)", color: "var(--brand)" }}
                               onClick={(event) => {
                                 event.stopPropagation();
                                 openEvidence(row.deliveryId, row.label);
@@ -321,7 +321,7 @@ export function DashboardPage() {
                   <button
                     type="button"
                     className="px-3 py-1.5 rounded-lg text-[12.5px] font-semibold disabled:opacity-35 disabled:cursor-not-allowed"
-                    style={{ border: "1px solid #00000018", color: "var(--text)", background: "#fff" }}
+                    style={{ border: "1px solid var(--border-field)", color: "var(--text)", background: "var(--surface)" }}
                     disabled={page <= 1}
                     onClick={() => updateParams({ page: String(page - 1) })}
                   >
@@ -333,7 +333,7 @@ export function DashboardPage() {
                   <button
                     type="button"
                     className="px-3 py-1.5 rounded-lg text-[12.5px] font-semibold disabled:opacity-35 disabled:cursor-not-allowed"
-                    style={{ border: "1px solid #00000018", color: "var(--text)", background: "#fff" }}
+                    style={{ border: "1px solid var(--border-field)", color: "var(--text)", background: "var(--surface)" }}
                     disabled={page >= pageCount}
                     onClick={() => updateParams({ page: String(page + 1) })}
                   >

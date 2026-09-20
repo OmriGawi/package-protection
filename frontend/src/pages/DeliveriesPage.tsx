@@ -137,15 +137,15 @@ export function DeliveriesPage() {
       <div className="flex flex-col items-center mb-12">
         <Logo size="hero" />
         <div className="text-center" style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 28, fontWeight: 800, color: "#12384c" }}>מערכת להגנה על אריזות</div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "#2b7fae", marginTop: 6, letterSpacing: ".02em" }}>
+          <div style={{ fontSize: 28, fontWeight: 800, color: "var(--wordmark)" }}>מערכת להגנה על אריזות</div>
+          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--wordmark-sub)", marginTop: 6, letterSpacing: ".02em" }}>
             אבטחת אריזות מקצה לקצה
           </div>
         </div>
       </div>
 
       <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-        <h1 className="text-[26px] font-extrabold tracking-tight" style={{ color: "var(--navy)" }}>
+        <h1 className="text-[26px] font-extrabold tracking-tight" style={{ color: "var(--brand)" }}>
           המשלוחים שלי
         </h1>
         <button type="button" className="btn-primary" onClick={() => navigate("/deliveries/new")}>
@@ -191,7 +191,7 @@ export function DeliveriesPage() {
         {result ? `נמצאו ${result.total} משלוחים` : ""}
       </p>
 
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+      <div className="rounded-2xl shadow-sm overflow-hidden" data-surface style={{ border: "1px solid var(--border)" }}>
         {error ? (
           <p role="alert" className="px-6 py-5 text-[13px]" style={{ color: "var(--red)" }}>
             {error}
@@ -309,7 +309,7 @@ export function DeliveriesPage() {
                   <button
                     type="button"
                     className="px-3 py-1.5 rounded-lg text-[12.5px] font-semibold disabled:opacity-35 disabled:cursor-not-allowed"
-                    style={{ border: "1px solid #00000018", color: "var(--text)", background: "#fff" }}
+                    style={{ border: "1px solid var(--border-field)", color: "var(--text)", background: "var(--surface)" }}
                     disabled={page <= 1}
                     onClick={() => updateParams({ page: String(page - 1) })}
                   >
@@ -321,7 +321,7 @@ export function DeliveriesPage() {
                   <button
                     type="button"
                     className="px-3 py-1.5 rounded-lg text-[12.5px] font-semibold disabled:opacity-35 disabled:cursor-not-allowed"
-                    style={{ border: "1px solid #00000018", color: "var(--text)", background: "#fff" }}
+                    style={{ border: "1px solid var(--border-field)", color: "var(--text)", background: "var(--surface)" }}
                     disabled={page >= pageCount}
                     onClick={() => updateParams({ page: String(page + 1) })}
                   >

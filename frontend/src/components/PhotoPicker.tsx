@@ -22,7 +22,7 @@ export function PhotoDropzone({
         }}
         style={{ display: "none" }}
       />
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#00000055" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--icon-muted)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
         <path d="M7 18a4 4 0 01-1-7.87A5.5 5.5 0 0116.9 8H17a4 4 0 011 7.87" />
         <path d="M12 12v7" />
         <path d="M9 15l3-3 3 3" />

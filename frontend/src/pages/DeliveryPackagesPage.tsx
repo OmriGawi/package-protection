@@ -165,7 +165,7 @@ export function DeliveryPackagesPage() {
                 deliveries and dashboard tables. */}
             <h1
               className="text-2xl font-extrabold"
-              style={{ color: "var(--navy)", direction: "ltr", textAlign: "right" }}
+              style={{ color: "var(--brand)", direction: "ltr", textAlign: "right" }}
             >
               {delivery.referenceNumber}
             </h1>
@@ -175,7 +175,7 @@ export function DeliveryPackagesPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+          <div className="rounded-2xl shadow-sm overflow-hidden" data-surface style={{ border: "1px solid var(--border)" }}>
             {/* The card clips what overflows it, so without this the columns
                 narrow out of reach instead of scrolling. Same wrapper the
                 deliveries and dashboard tables have. */}
@@ -236,7 +236,7 @@ export function DeliveryPackagesPage() {
                           >
                             <span
                               className="inline-block w-2.5 h-2.5 rounded-full"
-                              style={{ border: "2px solid #ffffff", borderTopColor: "var(--blue)", animation: "spin .7s linear infinite" }}
+                              style={{ border: "2px solid var(--surface)", borderTopColor: "var(--blue)", animation: "spin .7s linear infinite" }}
                             />
                             מבצע בדיקה…
                           </span>
@@ -254,7 +254,7 @@ export function DeliveryPackagesPage() {
                           <button
                             type="button"
                             className="px-3.5 py-1.5 rounded-lg text-[12.5px] font-semibold"
-                            style={{ border: "1px solid #00000018", color: "var(--text)" }}
+                            style={{ border: "1px solid var(--border-field)", color: "var(--text)" }}
                             onClick={(event) => {
                               event.stopPropagation();
                               setExpanded({ label: pkg.label, mode: "upload" });
@@ -286,7 +286,7 @@ export function DeliveryPackagesPage() {
                     isExpanded && (
                       <tr
                         key={`${pkg.id}-panel`}
-                        style={{ borderBottom: "1px solid var(--border)", background: "#fafbfc" }}
+                        style={{ borderBottom: "1px solid var(--border)", background: "var(--surface-sunken)" }}
                         onClick={(event) => event.stopPropagation()}
                       >
                         <td colSpan={5} className="px-6 py-5">

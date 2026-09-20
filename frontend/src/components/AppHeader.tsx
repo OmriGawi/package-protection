@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { Logo } from "./Logo";
+import { ThemeToggle } from "./ThemeToggle";
 
 /** Both destinations are reachable by anyone: there is no login (DESIGN.md §6,
  *  §9), so role-gating the manager view would be theatre. Real Employee vs
@@ -27,12 +28,12 @@ export function AppHeader() {
   return (
     <header
       className="sticky top-0 z-10"
-      style={{ background: "#ffffffd9", backdropFilter: "blur(8px)", borderBottom: "1px solid var(--border)" }}
+      style={{ background: "var(--surface-header)", backdropFilter: "blur(8px)", borderBottom: "1px solid var(--border)" }}
     >
       <div className="max-w-7xl mx-auto px-8 h-16 flex items-center gap-8">
         <div className="flex items-center gap-2">
           <Logo />
-          <span className="font-extrabold text-[15px]" style={{ color: "var(--navy)" }}>
+          <span className="font-extrabold text-[15px]" style={{ color: "var(--brand)" }}>
             Package Protection
           </span>
         </div>
@@ -62,6 +63,12 @@ export function AppHeader() {
             );
           })}
         </nav>
+
+        {/* Pushed to the far end of the bar, away from navigation: it changes
+            how the app looks, not where you are. */}
+        <div className="mr-auto">
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );
