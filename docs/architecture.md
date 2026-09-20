@@ -65,7 +65,7 @@ visible.
 |---|---|---|
 | `POST` | `/api/deliveries/validate-reference` | Check a shipment/PO number against the ERP mock |
 | `POST` | `/api/deliveries` | Create a delivery with all its packages and pre-ship photos, in one request. Honours `Idempotency-Key`: a repeat answers 200 with the original delivery |
-| `GET` | `/api/deliveries` | The list: derived status, search, filter, sort, paging |
+| `GET` | `/api/deliveries` | The list: derived status, search, filter, paging. Ordered newest-first; the order is fixed, not a parameter |
 | `GET` | `/api/deliveries/:id` | One delivery with packages and images |
 | `POST` | `/api/packages/:id/post-receive-photos` | Upload receive photos, then run the check |
 | `POST` | `/api/packages/:id/tamper-check` | Retry a check that failed |
@@ -255,8 +255,10 @@ computes `attentionStatus` in SQL from the delivery's packages, worst-first
 (DESIGN.md §4.3). It is deliberately not called `status`: `Delivery.status`
 persists `SUBMITTED` and means something else entirely.
 
-Filtering, sorting and paging all run in Postgres, so a page is 20 rows however
-large the history grows. See `services/deliveryQuery.ts`.
+Filtering, ordering and paging all run in Postgres, so a page is 20 rows however
+large the history grows. See `services/deliveryQuery.ts`. The order is fixed at
+`internalNumber DESC` — the screen offers no sort control and the endpoint takes
+no sort parameter.
 
 The dashboard (§4.4) derives a different thing from the same rows:
 `services/packageQuery.ts` flattens every package across every delivery and
