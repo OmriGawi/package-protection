@@ -135,8 +135,12 @@ deep-links into the panel §4.2 already has. Both the package number and where
 the visit came from ride in the query string, so a refresh keeps the panel open
 and Back still returns to the dashboard rather than to the employee's own list.
 
-Its stat cards are fixed: they count the whole operation and ignore the search
-and filter below them.
+Each stat card sets the filter it counts, and the "סה״כ חבילות" card clears it
+— the card row and the chip row below it are two ways to ask the same question,
+reading and writing the same URL parameter.
+
+Its stat cards are fixed in what they count: the whole operation, ignoring the
+search and filter below them.
 
 ## The manager's override (§4.4.5)
 
