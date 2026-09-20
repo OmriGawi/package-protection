@@ -305,6 +305,19 @@ table {
   padding: 0;
 }
 
+/* One definition of a table cell's padding, so row density is a single number
+   rather than thirty-odd copies of it across four files. 10px top and bottom
+   puts a 20-row page at roughly 800px — the whole page on a laptop screen,
+   which is what a triage table is for (DESIGN.md §4.3, §4.4). */
+.cell {
+  padding: 10px 24px;
+}
+/* The header sits tighter still: it is one line of small caps-weight text and
+   does not need to match the rows it labels. */
+.cell-head {
+  padding: 9px 24px;
+}
+
 /* Placeholder rows while the first page of a table is in flight. The shape of
    the table is the useful part — it says "rows are coming" where an empty
    table says "there are none". */

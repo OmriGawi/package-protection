@@ -184,14 +184,14 @@ export function DeliveryPackagesPage() {
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
                   {["חבילה", "סטטוס תהליך", "תוצאה"].map((heading) => (
-                    <th key={heading} className="text-right font-semibold px-6 py-3.5 text-[11.5px]" style={{ color: "var(--text-secondary)" }}>
+                    <th key={heading} className="cell-head text-right font-semibold text-[11.5px]" style={{ color: "var(--text-secondary)" }}>
                       {heading}
                     </th>
                   ))}
                   {/* Action button, then the row chevron. Both headerless —
                       neither cell holds a column of data to name. */}
-                  <th className="px-6 py-3.5" />
-                  <th className="px-6 py-3.5" />
+                  <th className="cell-head" />
+                  <th className="cell-head" />
                 </tr>
               </thead>
               <tbody>
@@ -212,7 +212,7 @@ export function DeliveryPackagesPage() {
                           control is a button and not a link. aria-expanded is
                           what tells a screen reader the panel below belongs to
                           it; the row's own onClick stays for the mouse. */}
-                      <td className="px-6 py-4 font-semibold">
+                      <td className="cell font-semibold">
                         <button
                           type="button"
                           className="row-link"
@@ -225,10 +225,10 @@ export function DeliveryPackagesPage() {
                           חבילה {pkg.label}
                         </button>
                       </td>
-                      <td className="px-6 py-4" style={{ color: "var(--text-secondary)" }}>
+                      <td className="cell" style={{ color: "var(--text-secondary)" }}>
                         {WORKFLOW_TEXT[pkg.workflowStatus]}
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="cell">
                         {pkg.workflowStatus === "CHECKING" ? (
                           <span
                             className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11.5px] font-semibold"
@@ -249,7 +249,7 @@ export function DeliveryPackagesPage() {
                           </span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-left">
+                      <td className="cell text-left">
                         {pkg.workflowStatus === "SHIPPED" && (
                           <button
                             type="button"
@@ -278,7 +278,7 @@ export function DeliveryPackagesPage() {
                           </button>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-left" style={{ color: "var(--text-secondary)" }}>
+                      <td className="cell text-left" style={{ color: "var(--text-secondary)" }}>
                         <RowChevron />
                       </td>
                     </tr>,

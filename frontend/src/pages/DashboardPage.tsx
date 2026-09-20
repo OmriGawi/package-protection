@@ -197,7 +197,7 @@ export function DashboardPage() {
                       (heading) => (
                         <th
                           key={heading}
-                          className="text-right font-semibold px-6 py-3.5 text-[11.5px]"
+                          className="cell-head text-right font-semibold text-[11.5px]"
                           style={{ color: "var(--text-secondary)" }}
                         >
                           {heading}
@@ -206,8 +206,8 @@ export function DashboardPage() {
                     )}
                     {/* Review action, then the row chevron — neither names a
                         column of data. */}
-                    <th className="px-6 py-3.5" />
-                    <th className="px-6 py-3.5" />
+                    <th className="cell-head" />
+                    <th className="cell-head" />
                   </tr>
                 </thead>
                 <tbody>
@@ -234,7 +234,7 @@ export function DashboardPage() {
                         {/* Same pair as the deliveries table: the row click is
                             for the mouse, the link is what keyboard and screen
                             reader users actually reach. */}
-                        <td className="px-6 py-4 font-semibold">
+                        <td className="cell font-semibold">
                           <Link
                             to={evidencePath(row.deliveryId, row.label)}
                             className="row-link"
@@ -244,16 +244,16 @@ export function DashboardPage() {
                           </Link>
                         </td>
                         <td
-                          className="px-6 py-4"
+                          className="cell"
                           style={{ color: "var(--text-secondary)", direction: "ltr", textAlign: "right" }}
                         >
                           {row.deliveryReference}
                         </td>
-                        <td className="px-6 py-4" style={{ color: "var(--text-secondary)" }}>
+                        <td className="cell" style={{ color: "var(--text-secondary)" }}>
                           {DIRECTION_TEXT[row.direction]}
                         </td>
-                        <td className="px-6 py-4 font-semibold">{row.label}</td>
-                        <td className="px-6 py-4">
+                        <td className="cell font-semibold">{row.label}</td>
+                        <td className="cell">
                           <span
                             className="inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-semibold"
                             style={{ color: badge.color, background: badge.bg }}
@@ -278,10 +278,10 @@ export function DashboardPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-[12.5px]" style={{ color: "var(--text-secondary)" }}>
+                        <td className="cell text-[12.5px]" style={{ color: "var(--text-secondary)" }}>
                           {verdictSourceText(row)}
                         </td>
-                        <td className="px-6 py-4 text-left">
+                        <td className="cell text-left">
                           {/* Only where a human can still change the verdict
                               (§4.4.4). Same destination as the row — the button
                               marks which rows are waiting on a decision. */}
@@ -299,7 +299,7 @@ export function DashboardPage() {
                             </button>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-left" style={{ color: "var(--text-secondary)" }}>
+                        <td className="cell text-left" style={{ color: "var(--text-secondary)" }}>
                           <RowChevron />
                         </td>
                       </tr>
