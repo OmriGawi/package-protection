@@ -23,12 +23,12 @@ function isFilterKey(value: string): value is PackageFilterKey {
  *  in a verdict badge, so "failed" is purple: an operational hiccup, not
  *  evidence of tampering. */
 const CARDS = [
-  { key: "total", label: "סה״כ חבילות", color: "var(--text)" },
-  { key: "opened", label: "נפתחו", color: "var(--red)" },
-  { key: "inconclusive", label: "דורשות בדיקה", color: "var(--amber)" },
-  { key: "pending", label: "ממתינות", color: "var(--text)" },
-  { key: "checkFailed", label: "שגיאת בדיקה", color: "var(--purple)" },
-] as const;
+  { key: "total", label: "סה״כ חבילות", color: "var(--text)", filter: null },
+  { key: "opened", label: "נפתחו", color: "var(--red)", filter: "OPENED" },
+  { key: "inconclusive", label: "דורשות בדיקה", color: "var(--amber)", filter: "INCONCLUSIVE" },
+  { key: "pending", label: "ממתינות", color: "var(--text)", filter: "PENDING" },
+  { key: "checkFailed", label: "שגיאת בדיקה", color: "var(--purple)", filter: "CHECK_FAILED" },
+] as const satisfies readonly { key: string; label: string; color: string; filter: PackageFilterKey | null }[];
 
 /**
  * The Inventory Manager's dashboard (DESIGN.md §4.4).
@@ -119,17 +119,33 @@ export function DashboardPage() {
         </h1>
       </div>
 
+      {/* Each card sets the filter it counts — a manager reading "12 opened"
+          wants those twelve, and the card is where they are already looking.
+          The counts themselves stay global (§4.4.1): they describe the
+          operation, not the filtered page, so clicking one never changes the
+          number on it. */}
       <div className="grid gap-3 mb-6" style={{ gridTemplateColumns: "repeat(5, minmax(0, 1fr))" }}>
-        {CARDS.map((card) => (
-          <div key={card.key} className="card" style={{ padding: "16px 18px" }}>
-            <div className="text-[11.5px]" style={{ color: card.color }}>
-              {card.label}
-            </div>
-            <div className="text-[22px] font-extrabold mt-1" style={{ color: card.color }}>
-              {result ? result.stats[card.key] : "—"}
-            </div>
-          </div>
-        ))}
+        {CARDS.map((card) => {
+          const active = card.filter === null ? filter === null : filter === card.filter;
+          return (
+            <button
+              key={card.key}
+              type="button"
+              // Same state the matching chip carries, read off the same URL
+              // param, so the two rows cannot disagree about what is selected.
+              aria-pressed={active}
+              className="card stat-card"
+              onClick={() => updateParams({ filter: card.filter, page: null })}
+            >
+              <span className="text-[11.5px]" style={{ color: card.color }}>
+                {card.label}
+              </span>
+              <span className="text-[22px] font-extrabold mt-1 block" style={{ color: card.color }}>
+                {result ? result.stats[card.key] : "—"}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">

@@ -148,6 +148,28 @@ table {
   background: var(--blue-soft);
 }
 
+/* A dashboard stat card that sets the filter it counts (DESIGN.md §4.4.1).
+   It is a button, so it resets what a button brings and keeps .card's shell. */
+.stat-card {
+  display: block;
+  width: 100%;
+  padding: 16px 18px;
+  text-align: right;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+.stat-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+/* Selected reads as a ring rather than a fill: the number and its color are
+   the content, and a filled card would bury both. */
+.stat-card[aria-pressed="true"] {
+  border-color: var(--navy);
+  box-shadow: inset 0 0 0 1px var(--navy);
+}
+
 /* A status filter chip (DESIGN.md §4.3, §4.4.2). The styling lives here rather
    than inline so the chip can answer the pointer: an inline style outranks a
    stylesheet, so a :hover rule had nothing to override. Selected state reads
@@ -343,6 +365,11 @@ table {
   .toast,
   .skeleton {
     animation: none;
+  }
+  /* The card still answers the pointer through its shadow and its ring; only
+     the lift goes. */
+  .stat-card:hover {
+    transform: none;
   }
   /* The colour change and the active link's pill say everything the swelling
      does, so the motion goes entirely. !important because the scale is an

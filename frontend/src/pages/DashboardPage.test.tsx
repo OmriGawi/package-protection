@@ -209,6 +209,38 @@ describe("DashboardPage", () => {
     expect(link).toHaveAttribute("href", "/deliveries/d7?package=3&from=dashboard");
   });
 
+  it("filters by the card that was clicked, and leaves the counts alone", async () => {
+    const list = vi.spyOn(apiClient, "listPackages").mockResolvedValue(page([row()]));
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("button", { name: /נפתחו/ }));
+
+    await waitFor(() =>
+      expect(list).toHaveBeenLastCalledWith({ search: undefined, filter: "OPENED", page: 1 })
+    );
+    // The card and its chip read the same URL param, so both report selected —
+    // "נפתחו" is the card (plural), "נפתחה" the chip.
+    expect(screen.getByRole("button", { name: /נפתחו/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "נפתחה" })).toHaveAttribute("aria-pressed", "true");
+    // §4.4.1: the counts describe the operation, not the filtered page.
+    expect(screen.getByRole("button", { name: /סה״כ חבילות/ })).toHaveTextContent("1700");
+  });
+
+  it("clears the filter from the total card", async () => {
+    const list = vi.spyOn(apiClient, "listPackages").mockResolvedValue(page([row()]));
+    const user = userEvent.setup();
+    renderPage("/dashboard?filter=OPENED");
+
+    await waitFor(() => expect(list).toHaveBeenCalledTimes(1));
+    await user.click(screen.getByRole("button", { name: /סה״כ חבילות/ }));
+
+    await waitFor(() =>
+      expect(list).toHaveBeenLastCalledWith({ search: undefined, filter: undefined, page: 1 })
+    );
+  });
+
   it("announces the result count when a filter changes the rows underneath", async () => {
     vi.spyOn(apiClient, "listPackages").mockResolvedValue(page([row()], { total: 1700 }));
     renderPage();

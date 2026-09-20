@@ -1114,3 +1114,15 @@ changelog entries.
   tables always had. Without it the card clipped the later columns out of reach
   rather than under a scrollbar, which the removal of its 900px cap earlier the
   same day had made easy to hit.
+- 2026-09-20: **The dashboard's stat cards set the filter they count** (§4.4.1).
+  A manager reading "12 נפתחו" wants those twelve packages, and the card is
+  where they are already looking — the chip row below was the only way to ask
+  for them. Each card is a button now, selected state read off the same URL
+  parameter its matching chip reads, so the two rows cannot disagree. The
+  "סה״כ חבילות" card clears the filter.
+
+  What does not change is the counts. §4.4.1 has them ignoring the search and
+  the filter because they describe the operation rather than the page, and that
+  still holds: clicking a card never changes the number on it. Selected reads
+  as a navy ring rather than a fill, since the number and its color are the
+  content and a filled card would bury both.
