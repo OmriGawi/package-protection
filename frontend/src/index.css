@@ -116,10 +116,8 @@ table {
   font-size: 13px;
 }
 
-/* The header nav. One pill slides between the links instead of each link
-   painting its own background: the nav then reads as a single control with a
-   moving marker, and the marker glides home to the current page when the
-   pointer leaves. */
+/* The header nav, magnifying like the macOS Dock: AppHeader sets each link's
+   scale from how far it is from the pointer, and this carries the motion. */
 .nav {
   position: relative;
   display: flex;
@@ -127,36 +125,27 @@ table {
   gap: 4px;
 }
 
-.nav-pill {
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  border-radius: 8px;
-  background: var(--blue-soft);
-  pointer-events: none;
-  /* Fast out of the gate and slow into the stop — movement that has somewhere
-     to be, rather than an even glide. */
-  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
-    width 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
 .nav-link {
-  position: relative;
-  z-index: 1;
   padding: 8px 14px;
   border-radius: 8px;
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
   color: var(--text-secondary);
-  transition: color 0.2s;
+  /* Grows out of the bar rather than out of its own middle, the way a Dock
+     icon does. The curve overshoots slightly and settles — that small bounce
+     is the whole character of the effect. */
+  transform-origin: center bottom;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), color 0.2s;
 }
-/* The pill carries the background, so a link only has its text to change —
-   and it darkens whether it is hovered or is the page you are on. */
 .nav-link:hover,
 .nav-link.is-active {
   color: var(--navy);
+}
+/* The current page keeps a marker of its own: magnification says where the
+   pointer is, not which page you are on. */
+.nav-link.is-active {
+  background: var(--blue-soft);
 }
 
 /* A status filter chip (DESIGN.md §4.3, §4.4.2). The styling lives here rather
@@ -338,9 +327,11 @@ table {
   .toast {
     animation: none;
   }
-  /* The pill still marks the right link, it just stops travelling: the motion
-     is decoration, the pill itself is the signal. */
-  .nav-pill {
-    transition: none;
+  /* The colour change and the active link's pill say everything the swelling
+     does, so the motion goes entirely. !important because the scale is an
+     inline style — computed per item, so it cannot be a rule of its own. */
+  .nav-link {
+    transform: none !important;
+    transition: color 0.2s;
   }
 }
