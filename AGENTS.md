@@ -44,7 +44,7 @@ cd backend  && npm run dev      # :4000
 cd frontend && npm run dev      # :5173
 ```
 
-If the database is unreachable, the backend still starts and `GET /ready`
+If the database is unreachable, the backend still starts and `GET /api/ready`
 returns 503. Check the port-forward before assuming the app is broken.
 
 On the Windows workstation the commands differ — `npm.cmd`, a TLS flag, and a
