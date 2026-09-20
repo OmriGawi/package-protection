@@ -6,15 +6,21 @@
   --text: #000000e6;
   --text-secondary: #666666;
   --navy: #004370;
-  --blue: #0098f2;
+  /* Each hue is dark enough to clear WCAG AA (4.5:1) as text on its own soft
+     background, on the page background, and with white text on top of it —
+     the three ways these five are used. The originals came from the mockup
+     and sat between 2.6:1 and 4.1:1, which made every status badge and every
+     error line fail. The -soft backgrounds keep the original, lighter hue:
+     they are backgrounds, so only the foreground had to move. */
+  --blue: #006bab;
   --blue-soft: #0098f229;
-  --purple: #6c56fc;
+  --purple: #593ffc;
   --purple-soft: #6c55fc29;
-  --green: #5d9c06;
+  --green: #457305;
   --green-soft: #5d9c0629;
-  --red: #ff6363;
+  --red: #d10000;
   --red-soft: #ff636329;
-  --amber: #c98a00;
+  --amber: #8e6100;
   --amber-soft: #c98a0022;
   --border: #00000014;
 }
