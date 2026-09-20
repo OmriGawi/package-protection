@@ -75,7 +75,7 @@ export function PackagesCard({
   return (
     <div className="card" style={{ padding: "26px 28px" }}>
       <div className="flex items-center justify-between mb-1">
-        <div className="text-[13.5px] font-bold">חבילות</div>
+        <h2 className="text-[13.5px] font-bold">חבילות</h2>
         <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>
           {packages.length} חבילות נוספו
         </span>

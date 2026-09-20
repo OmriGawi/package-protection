@@ -1094,3 +1094,23 @@ changelog entries.
   an inline style outranks a stylesheet and a `:hover` rule had nothing to
   override. Inline styling is fine for anything computed per item — the Dock
   scale is — and wrong for anything with a state the stylesheet should own.
+- 2026-09-20: **A loading table no longer claims to be an empty one.** Rows
+  render only once the first page resolves, so both tables sat as headers over
+  nothing while the request was in flight — and the empty-state copy under them
+  is specific enough to be actively wrong in that moment ("עדיין לא נוצרו
+  משלוחים" on a first load, "לא נמצאו משלוחים התואמים לחיפוש" on a filter that
+  has not come back). Placeholder rows carry the table's shape instead. They
+  appear on the first load only: a filter change keeps the previous rows on
+  screen, which is the behaviour §4.3 already relies on.
+
+  Alongside it, three things a screen reader could not reach. Every error — a
+  failed list, a failed upload, a failed review — was a red paragraph with no
+  role, so failures were visible and silent; they are alerts now. The two card
+  titles on the create-delivery page (§4.1) were styled divs, leaving that page
+  one heading over a wall of content. And a photo picked for upload carried
+  `alt=""`, marking as decorative the evidence this product exists to collect.
+
+  The packages table also gained the horizontal scroll container the other two
+  tables always had. Without it the card clipped the later columns out of reach
+  rather than under a scrollbar, which the removal of its 900px cap earlier the
+  same day had made easy to hit.

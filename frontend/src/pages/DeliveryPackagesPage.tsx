@@ -150,7 +150,7 @@ export function DeliveryPackagesPage() {
       </Link>
 
       {error && (
-        <p className="text-[13px]" style={{ color: "var(--red)" }}>
+        <p role="alert" className="text-[13px]" style={{ color: "var(--red)" }}>
           {error}
         </p>
       )}
@@ -176,7 +176,11 @@ export function DeliveryPackagesPage() {
           </div>
 
           <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
-            <table className="w-full text-sm">
+            {/* The card clips what overflows it, so without this the columns
+                narrow out of reach instead of scrolling. Same wrapper the
+                deliveries and dashboard tables have. */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
                   {["חבילה", "סטטוס תהליך", "תוצאה"].map((heading) => (
@@ -335,7 +339,8 @@ export function DeliveryPackagesPage() {
                   ];
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         </>
       )}

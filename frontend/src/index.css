@@ -283,6 +283,22 @@ table {
   padding: 0;
 }
 
+/* Placeholder rows while the first page of a table is in flight. The shape of
+   the table is the useful part — it says "rows are coming" where an empty
+   table says "there are none". */
+.skeleton {
+  display: block;
+  height: 11px;
+  border-radius: 999px;
+  background: #00000010;
+  animation: skeleton-pulse 1.3s ease-in-out infinite;
+}
+@keyframes skeleton-pulse {
+  50% {
+    background: #0000001f;
+  }
+}
+
 /* Confirmation that a just-created delivery is the row you are looking at.
    The wash decays to nothing so the row ends up styled like every other one —
    nothing here outlives the animation. */
@@ -324,7 +340,8 @@ table {
    information, so both are safe to show statically. */
 @media (prefers-reduced-motion: reduce) {
   .row-flash,
-  .toast {
+  .toast,
+  .skeleton {
     animation: none;
   }
   /* The colour change and the active link's pill say everything the swelling

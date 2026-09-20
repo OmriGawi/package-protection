@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { listPackages, type PackageFilterKey, type PackagePage } from "../api/client";
 import { RowChevron } from "../components/RowChevron";
 import { SearchField } from "../components/SearchField";
+import { TableSkeleton } from "../components/TableSkeleton";
 import { DIRECTION_TEXT, PACKAGE_FILTERS, verdictInfo, verdictSourceText } from "../lib/display";
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -167,7 +168,7 @@ export function DashboardPage() {
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
         {error ? (
-          <p className="px-6 py-5 text-[13px]" style={{ color: "var(--red)" }}>
+          <p role="alert" className="px-6 py-5 text-[13px]" style={{ color: "var(--red)" }}>
             {error}
           </p>
         ) : (
@@ -194,6 +195,10 @@ export function DashboardPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {/* Nothing has arrived yet: the empty states below all say
+                      something specific, and every one of them would be a lie
+                      while the first request is still in flight. */}
+                  {!result && <TableSkeleton columns={8} />}
                   {result && result.items.length === 0 && (
                     <tr>
                       <td colSpan={8} className="px-6 py-12 text-center text-[13px]" style={{ color: "var(--text-secondary)" }}>

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -178,6 +178,24 @@ describe("DashboardPage", () => {
     await waitFor(() =>
       expect(screen.getByText("/deliveries/d7?package=3&from=dashboard")).toBeInTheDocument()
     );
+  });
+
+  it("shows placeholder rows until the first page arrives", async () => {
+    let release: (value: apiClient.PackagePage) => void = () => {};
+    vi.spyOn(apiClient, "listPackages").mockReturnValue(
+      new Promise<apiClient.PackagePage>((resolve) => {
+        release = resolve;
+      })
+    );
+
+    renderPage();
+
+    expect(screen.getByRole("table").querySelectorAll(".skeleton").length).toBeGreaterThan(0);
+
+    await act(async () => release(page([row()])));
+
+    await waitFor(() => expect(screen.getByText("SHP-88291")).toBeInTheDocument());
+    expect(screen.getByRole("table").querySelectorAll(".skeleton")).toHaveLength(0);
   });
 
   it("reaches the evidence by keyboard, not only by clicking the row", async () => {
