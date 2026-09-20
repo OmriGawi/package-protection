@@ -159,6 +159,17 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {/* Filtering and paging swap the rows underneath without moving focus, so
+          nothing tells a screen reader that the table changed. Always in the
+          DOM, because a live region created at the same moment its text appears
+          is not announced. aria-live without role="status": the toast already
+          owns that role, and two status nodes would be ambiguous. The wording
+          is the count rather than the pager's range — what changed is how many
+          rows there are. */}
+      <p className="sr-only" aria-live="polite">
+        {result ? `נמצאו ${result.total} חבילות` : ""}
+      </p>
+
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
         {error ? (
           <p className="px-6 py-5 text-[13px]" style={{ color: "var(--red)" }}>

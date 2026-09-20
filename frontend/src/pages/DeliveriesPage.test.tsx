@@ -166,6 +166,14 @@ describe("DeliveriesPage", () => {
     expect(link).toHaveAttribute("href", "/deliveries/d1");
   });
 
+  it("announces the result count when a filter changes the rows underneath", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row()], { total: 239 }));
+    renderPage();
+
+    // Filtering moves no focus, so without a live region the change is silent.
+    await waitFor(() => expect(screen.getByText("נמצאו 239 משלוחים")).toBeInTheDocument());
+  });
+
   it("does not claim there are no deliveries when the page is merely past the end", async () => {
     vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([], { total: 100, page: 9 }));
 
