@@ -205,7 +205,7 @@ export function DeliveriesPage() {
                     {["מס' משלוח", "מס' הזמנה / תעודת משלוח", "חבילות", "סטטוס", "נוצר בתאריך"].map((heading) => (
                       <th
                         key={heading}
-                        className="text-right font-semibold px-6 py-3.5 text-[11.5px]"
+                        className="cell-head text-right font-semibold text-[11.5px]"
                         style={{ color: "var(--text-secondary)" }}
                       >
                         {heading}
@@ -213,7 +213,7 @@ export function DeliveriesPage() {
                     ))}
                     {/* Holds the row chevron. Empty on purpose — a header over
                         a decorative icon would be read out by a screen reader. */}
-                    <th className="px-6 py-3.5" />
+                    <th className="cell-head" />
                   </tr>
                 </thead>
                 <tbody>
@@ -255,7 +255,7 @@ export function DeliveriesPage() {
                             makes middle-click open a second tab. stopPropagation
                             keeps the row handler from navigating a second time
                             on top of it. */}
-                        <td className="px-6 py-4 font-semibold">
+                        <td className="cell font-semibold">
                           <Link
                             to={`/deliveries/${delivery.id}`}
                             className="row-link"
@@ -265,15 +265,15 @@ export function DeliveriesPage() {
                           </Link>
                         </td>
                         <td
-                          className="px-6 py-4"
+                          className="cell"
                           style={{ color: "var(--text-secondary)", direction: "ltr", textAlign: "right" }}
                         >
                           {delivery.referenceNumber}
                         </td>
-                        <td className="px-6 py-4" style={{ color: "var(--text-secondary)" }}>
+                        <td className="cell" style={{ color: "var(--text-secondary)" }}>
                           {delivery.packageCount}
                         </td>
-                        <td className="px-6 py-4">
+                        <td className="cell">
                           <span
                             className="inline-flex items-center px-2.5 py-1 rounded-full text-[11.5px] font-semibold"
                             style={{ color: badge.color, background: badge.bg }}
@@ -281,10 +281,10 @@ export function DeliveriesPage() {
                             {badge.text}
                           </span>
                         </td>
-                        <td className="px-6 py-4" style={{ color: "var(--text-secondary)" }}>
+                        <td className="cell" style={{ color: "var(--text-secondary)" }}>
                           {formatDate(delivery.createdAt)}
                         </td>
-                        <td className="px-6 py-4 text-left" style={{ color: "var(--text-secondary)" }}>
+                        <td className="cell text-left" style={{ color: "var(--text-secondary)" }}>
                           <RowChevron />
                         </td>
                       </tr>

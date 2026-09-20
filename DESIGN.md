@@ -1140,3 +1140,15 @@ changelog entries.
   entries here are a record of what was decided when, not a page to correct.
   The dashboard's own priority ordering (§4.4) was never in question — it is
   fixed too, and both docs already described it accurately.
+- 2026-09-20: **Table rows went from 52px to 40px.** `px-6 py-4` put a 20-row
+  page at about 1040px, so roughly twelve rows of a full page were on screen at
+  once and triage — the job both tables exist for (§4.3, §4.4) — started with a
+  scroll. Ten pixels top and bottom puts the same page at about 800px, which
+  fits a laptop screen whole.
+
+  The padding is one `.cell` rule now rather than thirty-odd copies of the same
+  two Tailwind classes across four files, so the next person who wants a
+  different density changes one number. The header is tighter still at 9px: one
+  line of small text has no reason to match the height of the rows it labels.
+  What kept its own spacing is everything that is not a row of data — the pager
+  strip, the error line, the tall empty-state cell and the expanded photo panel.
