@@ -154,6 +154,35 @@ describe("DeliveriesPage", () => {
     // Router-driven: the row navigates rather than opening an inline panel.
     expect(screen.queryByRole("table")).toBeInTheDocument();
   });
+  it("shows placeholder rows until the first page arrives, not an empty table", async () => {
+    let release: (value: apiClient.DeliveryPage) => void = () => {};
+    vi.spyOn(apiClient, "listDeliveries").mockReturnValue(
+      new Promise<apiClient.DeliveryPage>((resolve) => {
+        release = resolve;
+      })
+    );
+
+    renderPage();
+
+    // In flight: rows of placeholder bars, and none of the empty-state copy,
+    // every line of which would be wrong at this moment.
+    const table = screen.getByRole("table");
+    expect(table.querySelectorAll(".skeleton").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/עדיין לא נוצרו משלוחים/)).not.toBeInTheDocument();
+
+    await act(async () => release(page([row()])));
+
+    await waitFor(() => expect(screen.getByText("SHP-84213")).toBeInTheDocument());
+    expect(screen.getByRole("table").querySelectorAll(".skeleton")).toHaveLength(0);
+  });
+
+  it("announces a failure rather than only colouring it red", async () => {
+    vi.spyOn(apiClient, "listDeliveries").mockRejectedValue(new Error("boom"));
+    renderPage();
+
+    await waitFor(() => expect(screen.getByRole("alert")).toBeInTheDocument());
+  });
+
   it("reaches a delivery by keyboard, not only by clicking the row", async () => {
     vi.spyOn(apiClient, "listDeliveries").mockResolvedValue(page([row()]));
     renderPage();

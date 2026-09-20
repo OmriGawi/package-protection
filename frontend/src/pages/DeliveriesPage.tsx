@@ -4,6 +4,7 @@ import { listDeliveries, type DeliveryPage, type DeliveryStatusKey } from "../ap
 import { Logo } from "../components/Logo";
 import { RowChevron } from "../components/RowChevron";
 import { SearchField } from "../components/SearchField";
+import { TableSkeleton } from "../components/TableSkeleton";
 import { Toast } from "../components/Toast";
 import { DELIVERY_STATUS_INFO, STATUS_FILTERS, formatDate } from "../lib/display";
 
@@ -192,7 +193,7 @@ export function DeliveriesPage() {
 
       <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
         {error ? (
-          <p className="px-6 py-5 text-[13px]" style={{ color: "var(--red)" }}>
+          <p role="alert" className="px-6 py-5 text-[13px]" style={{ color: "var(--red)" }}>
             {error}
           </p>
         ) : (
@@ -216,6 +217,10 @@ export function DeliveriesPage() {
                   </tr>
                 </thead>
                 <tbody>
+                  {/* Nothing has arrived yet: the empty states below all say
+                      something specific, and every one of them would be a lie
+                      while the first request is still in flight. */}
+                  {!result && <TableSkeleton columns={6} />}
                   {result && result.items.length === 0 && (
                     // Three different causes, three different messages. An empty
                     // page of a non-empty result is not "nothing matched", and
