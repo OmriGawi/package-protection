@@ -109,6 +109,14 @@ for the rest of the delivery to matter.
 Search, status filter, sort and paging all run in Postgres and live in the URL,
 so a filtered view survives a refresh and the back button steps through it.
 
+Every table row can be opened two ways. Clicking anywhere on it works, and the
+cell holding the number is a real control of its own — a link on this screen
+and on the dashboard, a button on the delivery page, where the row expands a
+panel instead of navigating. That second path is the only one a keyboard or a
+screen reader has: a `<tr>` takes no focus and announces nothing. Filtering
+also swaps the rows underneath without moving focus, so both tables hold a
+polite live region carrying the result count.
+
 ## The dashboard (§4.4)
 
 The mirror image of My Deliveries: that screen is one employee's deliveries,
@@ -117,7 +125,7 @@ the whole operation.
 
 ```mermaid
 flowchart LR
-  A["Dashboard<br/>every package, urgent first"] -->|"click a row"| B["/deliveries/:id<br/>?package=N&from=dashboard"]
+  A["Dashboard<br/>every package, urgent first"] -->|"open a row"| B["/deliveries/:id<br/>?package=N&from=dashboard"]
   B --> C["That package's photo panel,<br/>already open"]
   C -->|"Back"| A
 ```

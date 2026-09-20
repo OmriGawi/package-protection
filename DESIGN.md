@@ -1061,3 +1061,36 @@ changelog entries.
   derived from the URL and logged in `server_listening`, so the question the
   whole arrangement creates — which schema am I on — is answered by starting the
   app rather than by running `prisma migrate status`.
+- 2026-09-20: **The UI was mouse-only, and its status colors were unreadable.**
+  Every table row was a `<tr onClick>`: no keyboard could focus one and no
+  screen reader announced one, so opening a delivery, opening the evidence and
+  expanding a photo panel were all unreachable without a pointer. The cell
+  holding the row's number is now a real control — a link where the row
+  navigates, a button with `aria-expanded` where it expands a panel — and the
+  row keeps its own click for the mouse. Focus was invisible everywhere except
+  form fields; `:focus-visible` now covers everything.
+
+  The five status hues came from the mockup and had never been measured against
+  what they sit on. Composited over their own soft backgrounds they ran from
+  2.6:1 to 4.1:1, so every badge in the §4.3 and §4.4 tables, and every error
+  line, failed WCAG AA for normal text — at 11.5px, in the cells those tables
+  exist to be read from. The foregrounds are darker now and the `-soft`
+  backgrounds are unchanged; `index.css.test.ts` asserts the ratios, and caught
+  two of the five replacements while they were being chosen. Red reads as red
+  rather than coral, which is a visible change to the brand and a deliberate
+  one.
+
+  Also here: a skip link, a named `<main>`, and a polite live region per table
+  announcing the result count, since filtering swaps rows without moving focus.
+  The packages table lost a 900px cap that made it ~300px narrower than the
+  other two, so moving between them no longer re-lays out the page. Hover
+  states arrived on the filter chips and the header nav — the nav magnifies
+  like the macOS Dock, with the falloff written as a list indexed by distance
+  rather than a special case for today's two links. All of it goes quiet under
+  `prefers-reduced-motion`.
+
+  One thing worth knowing before the next piece of styling: several of these
+  needed styling moved out of inline `style` props and into `index.css`, because
+  an inline style outranks a stylesheet and a `:hover` rule had nothing to
+  override. Inline styling is fine for anything computed per item — the Dock
+  scale is — and wrong for anything with a state the stylesheet should own.
