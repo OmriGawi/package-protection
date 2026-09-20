@@ -1,6 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+// Vite's ?raw import rather than node:fs — the frontend has no @types/node and
+// this needs no dependency to add one.
+import css from "./index.css?raw";
 
 /**
  * The status hues are the whole point of the badges (DESIGN.md §4.3) and of
@@ -9,10 +10,6 @@ import { describe, expect, it } from "vitest";
  * between 2.6:1 and 4.1:1, and nothing catches that in review by eye.
  */
 const AA_NORMAL_TEXT = 4.5;
-
-// Resolved from the package root rather than from import.meta.url: the suite
-// runs under jsdom, where that is not a file: URL.
-const css = readFileSync(resolve(process.cwd(), "src/index.css"), "utf8");
 
 function token(name: string): string {
   const match = css.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6,8});`));
