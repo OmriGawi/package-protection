@@ -20,7 +20,7 @@ the Kubernetes cluster and you reach it with `kubectl port-forward` (or
 OpenLens) using credentials from a cluster Secret. Get them from the cluster,
 never from a file in this repo, and never commit them; `.env` is gitignored and
 stays that way. The port-forward has to stay running: without it the app starts
-but `GET /ready` returns 503, which reads like a broken app if you have
+but `GET /api/ready` returns 503, which reads like a broken app if you have
 forgotten the tunnel.
 
 `npm run setup` in `backend/` runs the migrations and then seeds development
@@ -28,12 +28,19 @@ data — four deliveries covering the states the screens are built around. It is
 re-runnable: the seed replaces only the rows it created, which are the ones
 whose reference number contains `SEED`.
 
-**If your Postgres is shared, give the tests their own.** The suite writes to
-whatever `DATABASE_URL` names, so on a cluster database that means your
-development data. Copy `backend/.env.test.example` to `.env.test` and point it
-at a separate database, or a separate schema in the same one — vitest loads it
-ahead of `.env`, so the separation is a file rather than a habit. With a
-throwaway container you don't need the file at all.
+**Give the tests their own database, on every machine.** The suite writes to
+whatever `DATABASE_URL` names, so by default that is your development data.
+Copy `backend/.env.test.example` to `backend/.env.test` and run `npx prisma
+migrate deploy` once with it — vitest loads it ahead of `.env`, so the
+separation is a file rather than a habit.
+
+On a shared Postgres the reason is that the suite must never touch a database
+someone else is reading. On a throwaway container it is smaller but real: a run
+deletes the seeded deliveries under whichever screen you had open and leaves a
+few hundred fixtures in their place, and `npm run seed` afterwards restores the
+seeded rows without removing the fixtures. This used to say the file was
+unnecessary with a container, which is how a development database ended up
+holding 188 of them.
 
 CI is unaffected either way: the workflow starts its own Postgres service
 container, which remains the impartial source of truth for whether the suite

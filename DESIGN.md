@@ -1027,3 +1027,20 @@ changelog entries.
   says why a decision was made; the notes say what shipped under which tag.
   That is also why the repository has no `CHANGELOG.md` — a third list of
   changes would only drift from these two.
+- 2026-09-20: **The documented probe paths were wrong, and the test suite now
+  has its own schema everywhere.** `AGENTS.md`, `CONTRIBUTING.md` and
+  `README.md` all named the probes as `GET /health` and `GET /ready`, but
+  `src/app.ts` mounts the health router under `/api`, so both of those return
+  404 — which looks exactly like a backend that failed to start, and is the
+  worst possible false signal in the one situation the docs mention them for:
+  checking whether a port-forward is up.
+
+  The second half is the reason the first was noticed. `backend/.env.test`
+  existed only as advice for a shared Postgres, on the grounds that a throwaway
+  container holds nothing worth protecting. That is true of the container and
+  false of the session: a single `npm run verify` deleted the five seeded
+  deliveries and left 188 fixtures in their place, so the dashboard filled with
+  `SHP-31337` rows. `npm run seed` restores the seeded rows and removes nothing,
+  which is the correct behaviour for a seed and no help here. The file is now
+  recommended on every machine, with the container's own database and a `test`
+  schema as the default the example file hands you.

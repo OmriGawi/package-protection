@@ -136,9 +136,9 @@ What the platform needs to know about this app:
   is the mock — deliberately, since a mock verdict is indistinguishable from a
   real one afterwards (`verdictSource` says `API` either way). A test cluster
   runs with `NODE_ENV=development` until the real API exists.
-- **Probes**: liveness `GET /health`, which deliberately does not touch the
+- **Probes**: liveness `GET /api/health`, which deliberately does not touch the
   database so a DB blip cannot get a healthy pod restarted; readiness
-  `GET /ready`, which fails while draining and when the database is
+  `GET /api/ready`, which fails while draining and when the database is
   unreachable.
 - **Give it time to drain.** `terminationGracePeriodSeconds` must exceed
   `SHUTDOWN_GRACE_MS` (default 10s). On SIGTERM the process stops accepting
