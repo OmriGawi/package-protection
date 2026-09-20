@@ -113,6 +113,35 @@ table {
   font-size: 13px;
 }
 
+/* A status filter chip (DESIGN.md §4.3, §4.4.2). The styling lives here rather
+   than inline so the chip can answer the pointer: an inline style outranks a
+   stylesheet, so a :hover rule had nothing to override. Selected state reads
+   off aria-pressed, which the button already has to carry anyway — one source
+   of truth instead of a class that could disagree with it. */
+.chip {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 9999px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #00000008;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+.chip:hover {
+  background: #00000014;
+  color: var(--text);
+}
+.chip[aria-pressed="true"] {
+  background: var(--navy);
+  color: #fff;
+}
+.chip[aria-pressed="true"]:hover {
+  opacity: 0.85;
+}
+
 /* The real control inside a clickable table row (DeliveriesPage, DashboardPage,
    DeliveryPackagesPage). It inherits the cell's type so the row still reads as
    one line of text, and carries the keyboard affordance the row itself cannot:

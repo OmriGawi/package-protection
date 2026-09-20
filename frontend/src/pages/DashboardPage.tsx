@@ -142,12 +142,7 @@ export function DashboardPage() {
                 key={chip.key}
                 type="button"
                 aria-pressed={active}
-                className="px-3 py-1.5 rounded-full text-[12px] font-semibold transition"
-                style={
-                  active
-                    ? { background: "var(--navy)", color: "#fff" }
-                    : { background: "#00000008", color: "var(--text-secondary)" }
-                }
+                className="chip"
                 onClick={() =>
                   updateParams({ filter: chip.key === "ALL" ? null : chip.key, page: null })
                 }
