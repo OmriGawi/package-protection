@@ -175,7 +175,7 @@ export function DeliveryPackagesPage() {
             </p>
           </div>
 
-          <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)", maxWidth: 900 }}>
+          <div className="rounded-2xl bg-white shadow-sm overflow-hidden" style={{ border: "1px solid var(--border)" }}>
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
