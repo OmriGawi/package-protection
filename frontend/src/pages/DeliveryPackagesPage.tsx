@@ -7,10 +7,17 @@ import {
   type DeliveryDetail,
   type Package,
 } from "../api/client";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { ManagerReviewPanel } from "../components/ManagerReviewPanel";
 import { ReceivePhotosPanel } from "../components/ReceivePhotosPanel";
 import { RowChevron } from "../components/RowChevron";
-import { DIRECTION_TEXT, WORKFLOW_TEXT, formatDate, verdictInfo } from "../lib/display";
+import {
+  DIRECTION_TEXT,
+  WORKFLOW_TEXT,
+  discardPhotosWarning,
+  formatDate,
+  verdictInfo,
+} from "../lib/display";
 
 type Expansion = { label: number; mode: "view" | "upload" } | null;
 
@@ -41,7 +48,11 @@ export function DeliveryPackagesPage() {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Expansion>(null);
 
-  const [uploadDirty, setUploadDirty] = useState(false);
+  // A count, not a flag: the discard warning says how many photos are at stake.
+  const [pickedCount, setPickedCount] = useState(0);
+  const uploadDirty = pickedCount > 0;
+  /** The package a confirmation is being asked about, if one is open. */
+  const [pendingView, setPendingView] = useState<number | null>(null);
   const [retrying, setRetrying] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -114,9 +125,15 @@ export function DeliveryPackagesPage() {
   function toggleView(label: number) {
     // Clicking away from an upload panel with photos already picked would
     // discard them, so ask first — same guard as the pre-ship packages card.
+    // The dialog answers later than the click, so the label waits here.
     if (expanded?.mode === "upload" && uploadDirty) {
-      if (!window.confirm("התמונות שטרם נשלחו יימחקו. להמשיך?")) return;
+      setPendingView(label);
+      return;
     }
+    openView(label);
+  }
+
+  function openView(label: number) {
     setExpanded((current) =>
       current?.label === label && current.mode === "view" ? null : { label, mode: "view" }
     );
@@ -138,6 +155,17 @@ export function DeliveryPackagesPage() {
 
   return (
     <>
+      {pendingView !== null && (
+        <ConfirmDialog
+          {...discardPhotosWarning(pickedCount, "sent", `מעבר לחבילה ${pendingView}`, "ימחק")}
+          confirmLabel="מחיקת התמונות"
+          onCancel={() => setPendingView(null)}
+          onConfirm={() => {
+            openView(pendingView);
+            setPendingView(null);
+          }}
+        />
+      )}
       <Link
         to={cameFromDashboard ? "/dashboard" : "/deliveries"}
         className="inline-flex items-center gap-1.5 text-sm font-semibold mb-5"
@@ -294,7 +322,7 @@ export function DeliveryPackagesPage() {
                             <ReceivePhotosPanel
                               packageId={pkg.id}
                               label={pkg.label}
-                              onDirtyChange={setUploadDirty}
+                              onPickedCountChange={setPickedCount}
                               onSubmitted={() => {
                                 setExpanded(null);
                                 load().catch(() => setError("טעינת המשלוח נכשלה"));

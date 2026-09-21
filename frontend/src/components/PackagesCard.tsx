@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import type { DraftPackage } from "../api/client";
+import { discardPhotosWarning } from "../lib/display";
 import { nextPackageLabel } from "../lib/packageLabels";
 import { usePhotoDraft } from "../lib/usePhotoDraft";
+import { ConfirmDialog } from "./ConfirmDialog";
 import { PhotoDraftThumbs, PhotoDropzone } from "./PhotoPicker";
 
 export type DraftState = "none" | "new" | "editing";
@@ -23,6 +25,9 @@ export function PackagesCard({
 }) {
   const draft = usePhotoDraft();
   const [editingId, setEditingId] = useState<string | null>(null);
+  // The package waiting on an answer. A dialog answers later, so the click that
+  // asked cannot simply continue — it parks its intent here.
+  const [pendingEdit, setPendingEdit] = useState<DraftPackage | null>(null);
 
   const editingPackage = packages.find((p) => p.id === editingId) ?? null;
 
@@ -60,8 +65,14 @@ export function PackagesCard({
     if (pkg.id === editingId) return;
     // Opening a package replaces whatever is in the upload area, so a mis-click
     // here would silently bin photos the employee just picked for the next box.
-    if (draft.photos.length > 0 && !window.confirm("התמונות שטרם נשמרו יימחקו. להמשיך?")) return;
+    if (draft.photos.length > 0) {
+      setPendingEdit(pkg);
+      return;
+    }
+    openForEdit(pkg);
+  }
 
+  function openForEdit(pkg: DraftPackage) {
     draft.replace(pkg.photos);
     setEditingId(pkg.id);
   }
@@ -74,6 +85,22 @@ export function PackagesCard({
 
   return (
     <div className="card" style={{ padding: "26px 28px" }}>
+      {pendingEdit && (
+        <ConfirmDialog
+          {...discardPhotosWarning(
+            draft.photos.length,
+            "saved",
+            `פתיחת חבילה ${pendingEdit.label}`,
+            "תמחק"
+          )}
+          confirmLabel="מחיקת התמונות"
+          onCancel={() => setPendingEdit(null)}
+          onConfirm={() => {
+            openForEdit(pendingEdit);
+            setPendingEdit(null);
+          }}
+        />
+      )}
       <div className="flex items-center justify-between mb-1">
         <h2 className="text-[13.5px] font-bold">חבילות</h2>
         <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>

@@ -14,25 +14,26 @@ export function ReceivePhotosPanel({
   label,
   onSubmitted,
   onCancel,
-  onDirtyChange,
+  onPickedCountChange,
 }: {
   packageId: string;
   label: number;
   onSubmitted: () => void;
   onCancel: () => void;
-  /** Lets the page know photos are picked but unsent, so nothing closes this panel from under them. */
-  onDirtyChange?: (dirty: boolean) => void;
+  /** How many photos are picked but unsent, so nothing closes this panel from
+   *  under them — and so the warning can say how many are at stake. */
+  onPickedCountChange?: (count: number) => void;
 }) {
   const draft = usePhotoDraft();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const dirty = draft.photos.length > 0;
+  const picked = draft.photos.length;
   useEffect(() => {
-    onDirtyChange?.(dirty);
-    return () => onDirtyChange?.(false);
+    onPickedCountChange?.(picked);
+    return () => onPickedCountChange?.(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dirty]);
+  }, [picked]);
 
   async function submit() {
     if (!draft.hasEnough || submitting) return;

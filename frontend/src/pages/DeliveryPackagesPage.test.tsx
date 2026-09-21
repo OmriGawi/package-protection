@@ -109,6 +109,50 @@ describe("DeliveryPackagesPage", () => {
     await waitFor(() => expect(screen.getAllByText("מבצע בדיקה…").length).toBeGreaterThan(0));
   });
 
+  it("asks before dropping receive photos that have not been sent", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(
+      delivery([pkg(), pkg({ id: "p2", label: 2 })])
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("חבילה 1")).toBeInTheDocument());
+    await user.click(screen.getAllByRole("button", { name: "העלאת תמונות קבלה" })[0]);
+    await user.upload(document.querySelector('input[type="file"]') as HTMLInputElement, imageFiles(2));
+
+    // Two photos picked and not submitted; clicking another package would bin
+    // them, and they exist only in memory.
+    await user.click(screen.getByRole("button", { name: "חבילה 2" }));
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent("מעבר לחבילה 2 ימחק אותן.");
+    expect(within(dialog).getByRole("button", { name: "ביטול" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    // Still on the upload panel, photos intact.
+    expect(screen.getByRole("button", { name: "שליחה לבדיקה" })).toBeInTheDocument();
+  });
+
+  it("drops them once the dialog is confirmed", async () => {
+    vi.spyOn(apiClient, "getDelivery").mockResolvedValue(
+      delivery([pkg(), pkg({ id: "p2", label: 2 })])
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    await waitFor(() => expect(screen.getByText("חבילה 1")).toBeInTheDocument());
+    await user.click(screen.getAllByRole("button", { name: "העלאת תמונות קבלה" })[0]);
+    await user.upload(document.querySelector('input[type="file"]') as HTMLInputElement, imageFiles(2));
+
+    await user.click(screen.getByRole("button", { name: "חבילה 2" }));
+    await user.click(screen.getByRole("button", { name: "מחיקת התמונות" }));
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "שליחה לבדיקה" })).not.toBeInTheDocument();
+  });
+
   it("polls while a check is running and opens the photos once a verdict lands", async () => {
     const getDelivery = vi
       .spyOn(apiClient, "getDelivery")

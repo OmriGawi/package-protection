@@ -61,6 +61,11 @@ Two guards worth knowing:
   package, so submitting would drop them silently. The block distinguishes a
   package never saved from one reopened for editing — different mistakes,
   different instructions.
+- **Opening a saved package asks first** when the upload area is not empty,
+  because loading that package's photos replaces whatever is in it. The same
+  question guards the receive panel (§4.2), where clicking another package
+  would drop photos picked but not yet sent. Picked photos live only in memory
+  until the delivery is submitted, so the answer costs a walk back to the box.
 
 ## Receiving (§4.2)
 

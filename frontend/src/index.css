@@ -283,6 +283,60 @@ table {
   background: var(--blue-soft);
 }
 
+/* The confirmation dialog that replaced window.confirm. */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--scrim);
+  animation: dialog-in 0.12s ease-out;
+}
+.dialog {
+  width: 100%;
+  max-width: 420px;
+  padding: 22px 24px;
+  box-shadow: var(--shadow-raised);
+}
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The two buttons a dialog offers. The destructive one is the coloured one and
+   the safe one is quiet, which is the opposite of how the primary pill works
+   elsewhere: here the quiet button is the one we expect people to want. */
+.btn-secondary,
+.btn-danger {
+  padding: 9px 18px;
+  border-radius: 9999px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13.5px;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+.btn-secondary {
+  border: 1px solid var(--border-field);
+  background: var(--surface);
+  color: var(--text);
+}
+.btn-secondary:hover {
+  background: var(--tint);
+}
+.btn-danger {
+  border: none;
+  background: var(--red);
+  color: var(--on-accent);
+}
+.btn-danger:hover {
+  opacity: 0.85;
+}
+
 /* The light/dark switch. Quiet by default — it is a preference, not an action
    anyone came to the page to take — and it answers the pointer like the nav. */
 .theme-toggle {
@@ -540,7 +594,8 @@ table {
 @media (prefers-reduced-motion: reduce) {
   .row-flash,
   .toast,
-  .skeleton {
+  .skeleton,
+  .dialog-backdrop {
     animation: none;
   }
   /* The card still answers the pointer through its shadow and its ring; only

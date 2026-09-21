@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
@@ -124,14 +124,66 @@ describe("PackagesCard", () => {
 
     // Photos picked for box 2, then a mis-click on the saved package 1.
     await addPhotos(user, 2);
-    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
     await user.click(screen.getByText("חבילה 1"));
 
-    expect(confirmSpy).toHaveBeenCalled();
+    const dialog = screen.getByRole("alertdialog");
+    // How many photos are at stake, not just that some are.
+    expect(dialog).toHaveTextContent("פתיחת חבילה 1 תמחק אותן.");
+    // Cancelling holds focus, not the button that discards work.
+    expect(within(dialog).getByRole("button", { name: "ביטול" })).toHaveFocus();
+
+    await user.click(within(dialog).getByRole("button", { name: "ביטול" }));
+
     // Declined, so the draft survives and package 1 did not open for editing.
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
     expect(screen.getByText(/2 מתוך 4\+ מינימום/)).toBeInTheDocument();
     expect(screen.queryByText("חבילה 1 — בעריכה")).not.toBeInTheDocument();
-    confirmSpy.mockRestore();
+  });
+
+  it("warns in the singular when exactly one photo is at stake", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await addPhotos(user, 4);
+    await user.click(saveButton());
+    await addPhotos(user, 1);
+    await user.click(screen.getByText("חבילה 1"));
+
+    const dialog = screen.getByRole("alertdialog");
+    expect(dialog).toHaveTextContent("התמונה שבחרת טרם נשמרה");
+    expect(dialog).toHaveTextContent("פתיחת חבילה 1 תמחק אותה.");
+    expect(dialog).not.toHaveTextContent("(1)");
+  });
+
+  it("discards the picked photos once the dialog is confirmed", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await addPhotos(user, 4);
+    await user.click(saveButton());
+    await addPhotos(user, 2);
+    await user.click(screen.getByText("חבילה 1"));
+
+    await user.click(screen.getByRole("button", { name: "מחיקת התמונות" }));
+
+    // Package 1's own four photos replaced the two that were picked for box 2.
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByText("חבילה 1 — בעריכה")).toBeInTheDocument();
+  });
+
+  it("takes Escape as a cancel", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+
+    await addPhotos(user, 4);
+    await user.click(saveButton());
+    await addPhotos(user, 2);
+    await user.click(screen.getByText("חבילה 1"));
+
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByText(/2 מתוך 4\+ מינימום/)).toBeInTheDocument();
   });
 
   it("reopens a saved package's photos for editing and writes them back", async () => {
